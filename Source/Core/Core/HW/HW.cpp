@@ -33,9 +33,8 @@
 
 namespace HW
 {
-void Init(const Sram* override_sram, const std::string current_file_name)
+void Init(Core::System& system, const Sram* override_sram, const std::string current_file_name)
 {
-  auto& system = Core::System::GetInstance();
   system.GetCoreTiming().Init();
   SystemTimers::PreInit();
 
@@ -44,7 +43,7 @@ void Init(const Sram* override_sram, const std::string current_file_name)
   // Init the whole Hardware
   system.GetAudioInterface().Init();
   system.GetVideoInterface().Init();
-  SerialInterface::Init();
+  system.GetSerialInterface().Init();
   system.GetProcessorInterface().Init();
   system.GetExpansionInterface().Init(override_sram, current_file_name);  // Needs to be initialized before Memory
   system.GetHSP().Init();
@@ -64,10 +63,8 @@ void Init(const Sram* override_sram, const std::string current_file_name)
   }
 }
 
-void Shutdown()
+void Shutdown(Core::System& system)
 {
-  auto& system = Core::System::GetInstance();
-
   // IOS should always be shut down regardless of bWii because it can be running in GC mode (MIOS).
   IOS::HLE::Shutdown();  // Depends on Memory
   IOS::Shutdown();
@@ -81,23 +78,23 @@ void Shutdown()
   AddressSpace::Shutdown();
   system.GetMemory().Shutdown();
   system.GetHSP().Shutdown();
-  SerialInterface::Shutdown();
+  system.GetExpansionInterface().Shutdown();
+  system.GetSerialInterface().Shutdown();
   system.GetAudioInterface().Shutdown();
 
   State::Shutdown();
   system.GetCoreTiming().Shutdown();
 }
 
-void DoState(PointerWrap& p)
+void DoState(Core::System& system, PointerWrap& p)
 {
-  auto& system = Core::System::GetInstance();
   system.GetMemory().DoState(p);
   p.DoMarker("Memory");
   system.GetMemoryInterface().DoState(p);
   p.DoMarker("MemoryInterface");
   system.GetVideoInterface().DoState(p);
   p.DoMarker("VideoInterface");
-  SerialInterface::DoState(p);
+  system.GetSerialInterface().DoState(p);
   p.DoMarker("SerialInterface");
   system.GetProcessorInterface().DoState(p);
   p.DoMarker("ProcessorInterface");

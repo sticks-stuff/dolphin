@@ -47,6 +47,8 @@ private:
   void RemoveCode();
   void SaveCodes();
   void SortAlphabetically();
+  void SortEnabledCodesFirst();
+  void SortDisabledCodesFirst();
 
   std::string m_game_id;
   std::string m_gametdb_id;

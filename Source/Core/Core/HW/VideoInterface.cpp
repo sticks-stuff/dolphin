@@ -717,7 +717,7 @@ u32 VideoInterfaceManager::GetTargetRefreshRateDenominator() const
 
 u32 VideoInterfaceManager::GetTicksPerSample() const
 {
-  return 2 * SystemTimers::GetTicksPerSecond() / CLOCK_FREQUENCIES[m_clock];
+  return 2 * SystemTimers::GetTicksPerSecond() / CLOCK_FREQUENCIES[m_clock & 1];
 }
 
 u32 VideoInterfaceManager::GetTicksPerHalfLine() const
@@ -892,8 +892,9 @@ void VideoInterfaceManager::Update(u64 ticks)
   // {
   //   Core::UpdateInputGate(!Config::Get(Config::MAIN_INPUT_BACKGROUND_INPUT),
   //                         Config::Get(Config::MAIN_LOCK_CURSOR));
-  //   SerialInterface::UpdateDevices();
-  //   m_half_line_of_next_si_poll += 2 * SerialInterface::GetPollXLines();
+  //   auto& si = m_system.GetSerialInterface();
+  //   si.UpdateDevices();
+  //   m_half_line_of_next_si_poll += 2 * si.GetPollXLines();
   // }
 
   // // If this half-line is at the actual boundary of either field, schedule an SI poll to happen

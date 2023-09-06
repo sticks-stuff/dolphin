@@ -14,7 +14,7 @@ Ping or message nikki (metonym) in the Slippi Discord. https://slippi.gg/discord
 
 # Dolphin - A GameCube and Wii Emulator
 
-[Homepage](https://dolphin-emu.org/) | [Project Site](https://github.com/dolphin-emu/dolphin) | [Buildbot](https://dolphin.ci/) | [Forums](https://forums.dolphin-emu.org/) | [Wiki](https://wiki.dolphin-emu.org/) | [GitHub Wiki](https://github.com/dolphin-emu/dolphin/wiki) | [Issue Tracker](https://bugs.dolphin-emu.org/projects/emulator/issues) | [Coding Style](https://github.com/dolphin-emu/dolphin/blob/master/Contributing.md) | [Transifex Page](https://explore.transifex.com/delroth/dolphin-emu/)
+[Homepage](https://dolphin-emu.org/) | [Project Site](https://github.com/dolphin-emu/dolphin) | [Buildbot](https://dolphin.ci/) | [Forums](https://forums.dolphin-emu.org/) | [Wiki](https://wiki.dolphin-emu.org/) | [GitHub Wiki](https://github.com/dolphin-emu/dolphin/wiki) | [Issue Tracker](https://bugs.dolphin-emu.org/projects/emulator/issues) | [Coding Style](https://github.com/dolphin-emu/dolphin/blob/master/Contributing.md) | [Transifex Page](https://app.transifex.com/delroth/dolphin-emu/dashboard/)
 
 Dolphin is an emulator for running GameCube and Wii games on Windows,
 Linux, macOS, and recent Android devices. It's licensed under the terms
@@ -59,7 +59,7 @@ missing packages yourself.
 
 ### Rust
 This fork includes a [Rust submodule](https://github.com/project-slippi/slippi-rust-extensions) that needs to be built and linked to the final executable.
-This means that you will need to install a Rust compiler for your current system; to do this, simply visit 
+This means that you will need to install a Rust compiler for your current system; to do this, simply visit
 [rustup.rs](https://rustup.rs). Once installed, CMake should be able to automatically handle the rest for you.
 
 ### Windows
@@ -71,7 +71,7 @@ recommended to be used. Git and Windows 11 SDK must be installed when building.
 
 Make sure to pull submodules before building:
 ```sh
-git submodule update --init
+git submodule update --init --recursive
 ```
 
 The "Release" solution configuration includes performance optimizations for the best user experience but complicates debugging Dolphin.
@@ -144,7 +144,7 @@ Android dev environment set up, see [AndroidSetup.md](AndroidSetup.md).
 
 Make sure to pull submodules before building:
 ```sh
-git submodule update --init
+git submodule update --init --recursive
 ```
 
 If using Android Studio, import the Gradle project located in `./Source/Android`.

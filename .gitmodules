@@ -1,3 +1,9 @@
+[submodule "Externals/corrosion"]
+	path = Externals/corrosion
+	url = https://github.com/corrosion-rs/corrosion.git
+[submodule "Externals/SlippiRustExtensions"]
+	path = Externals/SlippiRustExtensions
+	url = https://github.com/project-slippi/slippi-rust-extensions.git
 [submodule "Externals/Qt"]
 	path = Externals/Qt
 	url = https://github.com/dolphin-emu/ext-win-qt.git
@@ -51,9 +57,12 @@
 [submodule "Externals/gtest"]
 	path = Externals/gtest
 	url = https://github.com/google/googletest.git
-[submodule "Externals/corrosion"]
-	path = Externals/corrosion
-	url = https://github.com/corrosion-rs/corrosion.git
-[submodule "Externals/SlippiRustExtensions"]
-	path = Externals/SlippiRustExtensions
-	url = https://github.com/project-slippi/slippi-rust-extensions.git
+[submodule "Externals/rcheevos/rcheevos"]
+	path = Externals/rcheevos/rcheevos
+	url = https://github.com/RetroAchievements/rcheevos.git
+[submodule "Externals/libadrenotools"]
+	path = Externals/libadrenotools
+	url = https://github.com/bylaws/libadrenotools.git
+[submodule "Externals/curl/curl"]
+	path = Externals/curl/curl
+	url = https://github.com/curl/curl.git

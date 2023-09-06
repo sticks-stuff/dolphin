@@ -363,8 +363,8 @@ void HotkeyScheduler::Run()
 
       // Graphics
       const auto efb_scale = Config::Get(Config::GFX_EFB_SCALE);
-      auto ShowEFBScale = []() {
-        switch (Config::Get(Config::GFX_EFB_SCALE))
+      const auto ShowEFBScale = [](int new_efb_scale) {
+        switch (new_efb_scale)
         {
         case EFB_SCALE_AUTO_INTEGRAL:
           OSD::AddMessage("Internal Resolution: Auto (integral)");
@@ -373,7 +373,7 @@ void HotkeyScheduler::Run()
           OSD::AddMessage("Internal Resolution: Native");
           break;
         default:
-          OSD::AddMessage(fmt::format("Internal Resolution: {}x", g_Config.iEFBScale));
+          OSD::AddMessage(fmt::format("Internal Resolution: {}x", new_efb_scale));
           break;
         }
       };
@@ -381,14 +381,14 @@ void HotkeyScheduler::Run()
       if (IsHotkey(HK_INCREASE_IR))
       {
         Config::SetCurrent(Config::GFX_EFB_SCALE, efb_scale + 1);
-        ShowEFBScale();
+        ShowEFBScale(efb_scale + 1);
       }
       if (IsHotkey(HK_DECREASE_IR))
       {
         if (efb_scale > EFB_SCALE_AUTO_INTEGRAL)
         {
           Config::SetCurrent(Config::GFX_EFB_SCALE, efb_scale - 1);
-          ShowEFBScale();
+          ShowEFBScale(efb_scale - 1);
         }
       }
 
@@ -505,6 +505,26 @@ void HotkeyScheduler::Run()
         if (IsHotkey(HK_DECREMENT_SELECTED_STATE_SLOT))
           emit DecrementSelectedStateSlotHotkey();
       }
+
+      // USB Device Emulation
+      if (IsHotkey(HK_SKYLANDERS_PORTAL))
+        emit SkylandersPortalHotkey();
+
+      if (IsHotkey(HK_INFINITY_BASE))
+        emit InfinityBaseHotkey();
+
+      // Slot Saving / Loading
+      if (IsHotkey(HK_SAVE_STATE_SLOT_SELECTED))
+        emit StateSaveSlotHotkey();
+
+      if (IsHotkey(HK_LOAD_STATE_SLOT_SELECTED))
+        emit StateLoadSlotHotkey();
+
+      if (IsHotkey(HK_INCREMENT_SELECTED_STATE_SLOT))
+        emit IncrementSelectedStateSlotHotkey();
+
+      if (IsHotkey(HK_DECREMENT_SELECTED_STATE_SLOT))
+        emit DecrementSelectedStateSlotHotkey();
 
       // Stereoscopy
       if (IsHotkey(HK_TOGGLE_STEREO_SBS))

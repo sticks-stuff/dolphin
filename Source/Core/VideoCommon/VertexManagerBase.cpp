@@ -15,6 +15,7 @@
 
 #include "Core/ConfigManager.h"
 #include "Core/DolphinAnalytics.h"
+#include "Core/HW/SystemTimers.h"
 #include "Core/System.h"
 
 #include "VideoCommon/AbstractGfx.h"
@@ -23,12 +24,14 @@
 #include "VideoCommon/DataReader.h"
 #include "VideoCommon/FramebufferManager.h"
 #include "VideoCommon/GeometryShaderManager.h"
+#include "VideoCommon/GraphicsModSystem/Runtime/CustomShaderCache.h"
 #include "VideoCommon/GraphicsModSystem/Runtime/GraphicsModActionData.h"
 #include "VideoCommon/GraphicsModSystem/Runtime/GraphicsModManager.h"
 #include "VideoCommon/IndexGenerator.h"
 #include "VideoCommon/NativeVertexFormat.h"
 #include "VideoCommon/OpcodeDecoding.h"
 #include "VideoCommon/PerfQueryBase.h"
+#include "VideoCommon/PixelShaderGen.h"
 #include "VideoCommon/PixelShaderManager.h"
 #include "VideoCommon/Statistics.h"
 #include "VideoCommon/TextureCacheBase.h"
@@ -73,26 +76,26 @@ constexpr Common::EnumMap<PrimitiveType, Primitive::GX_DRAW_POINTS> primitive_fr
 // by ~9% in opposite directions.
 // Just in case any game decides to take this into account, we do both these
 // tests with a large amount of slop.
-static constexpr float ASPECT_RATIO_SLOP = 0.11f;
 
-static bool IsAnamorphicProjection(const Projection::Raw& projection, const Viewport& viewport)
+static bool IsAnamorphicProjection(const Projection::Raw& projection, const Viewport& viewport,
+                                   const float ideal_ratio, const float slop)
 {
   // If ratio between our projection and viewport aspect ratios is similar to 16:9 / 4:3
-  // we have an anamorphic projection.
-  static constexpr float IDEAL_RATIO = (16 / 9.f) / (4 / 3.f);
+  // (the "ideal ratio"), we have an anamorphic projection. This value can be overridden
+  // by a GameINI.
 
   const float projection_ar = projection[2] / projection[0];
   const float viewport_ar = viewport.wd / viewport.ht;
 
-  return std::abs(std::abs(projection_ar / viewport_ar) - IDEAL_RATIO) <
-         IDEAL_RATIO * ASPECT_RATIO_SLOP;
+  return std::abs(std::abs(projection_ar / viewport_ar) - ideal_ratio) < ideal_ratio * slop;
 }
 
-static bool IsNormalProjection(const Projection::Raw& projection, const Viewport& viewport)
+static bool IsNormalProjection(const Projection::Raw& projection, const Viewport& viewport,
+                               const float slop)
 {
   const float projection_ar = projection[2] / projection[0];
   const float viewport_ar = viewport.wd / viewport.ht;
-  return std::abs(std::abs(projection_ar / viewport_ar) - 1) < ASPECT_RATIO_SLOP;
+  return std::abs(std::abs(projection_ar / viewport_ar) - 1) < slop;
 }
 
 VertexManagerBase::VertexManagerBase()
@@ -105,7 +108,10 @@ VertexManagerBase::~VertexManagerBase() = default;
 bool VertexManagerBase::Initialize()
 {
   m_frame_end_event = AfterFrameEvent::Register([this] { OnEndFrame(); }, "VertexManagerBase");
+  m_after_present_event = AfterPresentEvent::Register(
+      [this](PresentInfo& pi) { m_ticks_elapsed = pi.emulated_timestamp; }, "VertexManagerBase");
   m_index_generator.Init();
+  m_custom_shader_cache = std::make_unique<CustomShaderCache>();
   m_cpu_cull.Init();
   return true;
 }
@@ -140,7 +146,7 @@ DataReader VertexManagerBase::PrepareForAdditionalData(OpcodeDecoder::Primitive 
   PrimitiveType new_primitive_type = g_ActiveConfig.backend_info.bSupportsPrimitiveRestart ?
                                          primitive_from_gx_pr[primitive] :
                                          primitive_from_gx[primitive];
-  if (m_current_primitive_type != new_primitive_type)
+  if (m_current_primitive_type != new_primitive_type) [[unlikely]]
   {
     Flush();
 
@@ -149,9 +155,11 @@ DataReader VertexManagerBase::PrepareForAdditionalData(OpcodeDecoder::Primitive 
     SetRasterizationStateChanged();
   }
 
+  u32 remaining_indices = GetRemainingIndices(primitive);
+  u32 remaining_index_generator_indices = m_index_generator.GetRemainingIndices(primitive);
+
   // Check for size in buffer, if the buffer gets full, call Flush()
-  if (!m_is_flushed && (count > m_index_generator.GetRemainingIndices(primitive) ||
-                        count > GetRemainingIndices(primitive) ||
+  if (!m_is_flushed && (count > remaining_index_generator_indices || count > remaining_indices ||
                         needed_vertex_bytes > GetRemainingSize())) [[unlikely]]
   {
     Flush();
@@ -160,7 +168,7 @@ DataReader VertexManagerBase::PrepareForAdditionalData(OpcodeDecoder::Primitive 
   m_cull_all = cullall;
 
   // need to alloc new buffer
-  if (m_is_flushed)
+  if (m_is_flushed) [[unlikely]]
   {
     if (cullall)
     {
@@ -174,6 +182,8 @@ DataReader VertexManagerBase::PrepareForAdditionalData(OpcodeDecoder::Primitive 
       ResetBuffer(stride);
     }
 
+    remaining_index_generator_indices = m_index_generator.GetRemainingIndices(primitive);
+    remaining_indices = GetRemainingIndices(primitive);
     m_is_flushed = false;
   }
 
@@ -181,14 +191,14 @@ DataReader VertexManagerBase::PrepareForAdditionalData(OpcodeDecoder::Primitive 
   // won't have enough space in a few rare cases, such as vertex shader line/point expansion with a
   // ton of lines in one draw command, in which case we will either need to add support for
   // splitting a single draw command into multiple draws or using bigger indices.
-  ASSERT_MSG(VIDEO, count <= m_index_generator.GetRemainingIndices(primitive),
+  ASSERT_MSG(VIDEO, count <= remaining_index_generator_indices,
              "VertexManager: Too few remaining index values ({} > {}). "
              "32-bit indices or primitive breaking needed.",
-             count, m_index_generator.GetRemainingIndices(primitive));
-  ASSERT_MSG(VIDEO, count <= GetRemainingIndices(primitive),
+             count, remaining_index_generator_indices);
+  ASSERT_MSG(VIDEO, count <= remaining_indices,
              "VertexManager: Buffer not large enough for all indices! ({} > {}) "
              "Increase MAXIBUFFERSIZE or we need primitive breaking after all.",
-             count, GetRemainingIndices(primitive));
+             count, remaining_indices);
   ASSERT_MSG(VIDEO, needed_vertex_bytes <= GetRemainingSize(),
              "VertexManager: Buffer not large enough for all vertices! ({} > {}) "
              "Increase MAXVBUFFERSIZE or we need primitive breaking after all.",
@@ -497,12 +507,15 @@ void VertexManagerBase::Flush()
     auto& counts =
         is_perspective ? m_flush_statistics.perspective : m_flush_statistics.orthographic;
 
-    if (IsAnamorphicProjection(xfmem.projection.rawProjection, xfmem.viewport))
+    const float ideal_ratio = g_ActiveConfig.widescreen_heuristic_aspect_ratio_ideal;
+    const float slop = g_ActiveConfig.widescreen_heuristic_aspect_ratio_slop;
+
+    if (IsAnamorphicProjection(xfmem.projection.rawProjection, xfmem.viewport, ideal_ratio, slop))
     {
       ++counts.anamorphic_flush_count;
       counts.anamorphic_vertex_count += m_index_generator.GetIndexLen();
     }
-    else if (IsNormalProjection(xfmem.projection.rawProjection, xfmem.viewport))
+    else if (IsNormalProjection(xfmem.projection.rawProjection, xfmem.viewport, slop))
     {
       ++counts.normal_flush_count;
       counts.normal_vertex_count += m_index_generator.GetIndexLen();
@@ -519,10 +532,18 @@ void VertexManagerBase::Flush()
   auto& geometry_shader_manager = system.GetGeometryShaderManager();
   auto& vertex_shader_manager = system.GetVertexShaderManager();
 
+  if (g_ActiveConfig.bGraphicMods)
+  {
+    const double seconds_elapsed =
+        static_cast<double>(m_ticks_elapsed) / SystemTimers::GetTicksPerSecond();
+    pixel_shader_manager.constants.time_ms = seconds_elapsed * 1000;
+  }
+
   CalculateBinormals(VertexLoaderManager::GetCurrentVertexFormat());
   // Calculate ZSlope for zfreeze
   const auto used_textures = UsedTextures();
   std::vector<std::string> texture_names;
+  std::vector<u32> texture_units;
   if (!m_cull_all)
   {
     if (!g_ActiveConfig.bGraphicMods)
@@ -539,7 +560,12 @@ void VertexManagerBase::Flush()
         const auto cache_entry = g_texture_cache->Load(TextureInfo::FromStage(i));
         if (cache_entry)
         {
-          texture_names.push_back(cache_entry->texture_info_name);
+          if (std::find(texture_names.begin(), texture_names.end(),
+                        cache_entry->texture_info_name) == texture_names.end())
+          {
+            texture_names.push_back(cache_entry->texture_info_name);
+            texture_units.push_back(i);
+          }
         }
       }
     }
@@ -558,13 +584,24 @@ void VertexManagerBase::Flush()
 
   if (!m_cull_all)
   {
-    for (const auto& texture_name : texture_names)
+    CustomPixelShaderContents custom_pixel_shader_contents;
+    std::optional<CustomPixelShader> custom_pixel_shader;
+    std::vector<std::string> custom_pixel_texture_names;
+    for (int i = 0; i < texture_names.size(); i++)
     {
+      const std::string& texture_name = texture_names[i];
+      const u32 texture_unit = texture_units[i];
       bool skip = false;
-      GraphicsModActionData::DrawStarted draw_started{&skip};
-      for (const auto action : g_graphics_mod_manager->GetDrawStartedActions(texture_name))
+      GraphicsModActionData::DrawStarted draw_started{texture_unit, &skip, &custom_pixel_shader};
+      for (const auto& action : g_graphics_mod_manager->GetDrawStartedActions(texture_name))
       {
         action->OnDrawStarted(&draw_started);
+        if (custom_pixel_shader)
+        {
+          custom_pixel_shader_contents.shaders.push_back(*custom_pixel_shader);
+          custom_pixel_texture_names.push_back(texture_name);
+        }
+        custom_pixel_shader = std::nullopt;
       }
       if (skip == true)
         return;
@@ -606,7 +643,65 @@ void VertexManagerBase::Flush()
     UpdatePipelineObject();
     if (m_current_pipeline_object)
     {
-      g_gfx->SetPipeline(m_current_pipeline_object);
+      const AbstractPipeline* current_pipeline = m_current_pipeline_object;
+      if (!custom_pixel_shader_contents.shaders.empty())
+      {
+        CustomShaderInstance custom_shaders;
+        custom_shaders.pixel_contents = std::move(custom_pixel_shader_contents);
+
+        switch (g_ActiveConfig.iShaderCompilationMode)
+        {
+        case ShaderCompilationMode::Synchronous:
+        case ShaderCompilationMode::AsynchronousSkipRendering:
+        {
+          if (auto pipeline = m_custom_shader_cache->GetPipelineAsync(
+                  m_current_pipeline_config, custom_shaders, m_current_pipeline_object->m_config))
+          {
+            current_pipeline = *pipeline;
+          }
+        }
+        break;
+        case ShaderCompilationMode::SynchronousUberShaders:
+        {
+          // D3D has issues compiling large custom ubershaders
+          // use specialized shaders instead
+          if (g_ActiveConfig.backend_info.api_type == APIType::D3D)
+          {
+            if (auto pipeline = m_custom_shader_cache->GetPipelineAsync(
+                    m_current_pipeline_config, custom_shaders, m_current_pipeline_object->m_config))
+            {
+              current_pipeline = *pipeline;
+            }
+          }
+          else
+          {
+            if (auto pipeline = m_custom_shader_cache->GetPipelineAsync(
+                    m_current_uber_pipeline_config, custom_shaders,
+                    m_current_pipeline_object->m_config))
+            {
+              current_pipeline = *pipeline;
+            }
+          }
+        }
+        break;
+        case ShaderCompilationMode::AsynchronousUberShaders:
+        {
+          if (auto pipeline = m_custom_shader_cache->GetPipelineAsync(
+                  m_current_pipeline_config, custom_shaders, m_current_pipeline_object->m_config))
+          {
+            current_pipeline = *pipeline;
+          }
+          else if (auto uber_pipeline = m_custom_shader_cache->GetPipelineAsync(
+                       m_current_uber_pipeline_config, custom_shaders,
+                       m_current_pipeline_object->m_config))
+          {
+            current_pipeline = *uber_pipeline;
+          }
+        }
+        break;
+        };
+      }
+      g_gfx->SetPipeline(current_pipeline);
       if (PerfQueryBase::ShouldEmulate())
         g_perf_query->EnableQuery(bpmem.zcontrol.early_ztest ? PQG_ZCOMP_ZCOMPLOC : PQG_ZCOMP);
 
@@ -1001,4 +1096,10 @@ void VertexManagerBase::OnEndFrame()
   // and hybrid ubershaders have compiled the specialized shader, but without any
   // state changes the specialized shader will not take over.
   InvalidatePipelineObject();
+}
+
+void VertexManagerBase::NotifyCustomShaderCacheOfHostChange(const ShaderHostConfig& host_config)
+{
+  m_custom_shader_cache->SetHostConfig(host_config);
+  m_custom_shader_cache->Reload();
 }
