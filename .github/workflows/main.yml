@@ -51,10 +51,10 @@ jobs:
         include:
           - build_type: Netplay
             artifact_name: mainline-windows-netplay
-            build_config: -G "Ninja" -DCMAKE_BUILD_TYPE="Release" -DSLIPPI_PLAYBACK=false
+            build_config: -G "Ninja" -DCMAKE_BUILD_TYPE="Release" -DSLIPPI_PLAYBACK=false -DQt6_DIR:STRING="D:\a\dolphin\dolphin\Externals\Qt\Qt6.3.0\x64\lib\cmake\Qt6"
           - build_type: Playback
             artifact_name: mainline-windows-playback
-            build_config: -G "Ninja" -DCMAKE_BUILD_TYPE="Release" -DSLIPPI_PLAYBACK=true
+            build_config: -G "Ninja" -DCMAKE_BUILD_TYPE="Release" -DSLIPPI_PLAYBACK=true -DQt6_DIR:STRING="D:\a\dolphin\dolphin\Externals\Qt\Qt6.3.0\x64\lib\cmake\Qt6"
     name: "Windows ${{ matrix.build_type }}"
     runs-on: windows-2022
     steps:
