@@ -196,7 +196,7 @@ jobs:
           libcurl4-openssl-dev \
           libegl1-mesa-dev \
           libpng-dev \
-          qtbase5-private-dev \
+          qtbase6-private-dev \
           libxxf86vm-dev \
           x11proto-xinerama-dev \
           libfuse2
@@ -303,7 +303,7 @@ jobs:
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
-          chmod +x Tools/create-dmg/run.sh 
+          chmod +x Tools/create-dmg/run.sh
           ./Tools/create-dmg/run.sh --no-internet-enable \
             --volname "Slippi Dolphin Beta Installer" \
             --volicon "Data/slippi_dmg_icon.icns" \
