@@ -9,6 +9,11 @@
 #include <mutex>
 #include <string>
 
+#ifdef IS_PLAYBACK
+#ifndef IMGUI_DEFINE_MATH_OPERATORS
+#define IMGUI_DEFINE_MATH_OPERATORS
+#endif
+
 #include <fmt/format.h>
 #include <imgui.h>
 
@@ -20,11 +25,6 @@
 #include "Core/ConfigManager.h"
 #include "Core/Slippi/SlippiPlayback.h"
 #include "Core/System.h"
-
-#ifdef IS_PLAYBACK
-#ifndef IMGUI_DEFINE_MATH_OPERATORS
-#define IMGUI_DEFINE_MATH_OPERATORS
-#endif
 
 #include <imgui_internal.h>
 #include "Common/Logging/Log.h"
