@@ -87,7 +87,7 @@ jobs:
           mkdir build
           cd build
           cmake ${{ matrix.build_config }} ..
-          cmake --build . --target dolphin-emu
+          cmake --build . --target dolphin-emu -- -j4
       - name: "Prep ${{ matrix.build_type }} Artifact"
         working-directory: ${{ github.workspace }}
         run: |
@@ -303,7 +303,7 @@ jobs:
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
-          chmod +x Tools/create-dmg/run.sh 
+          chmod +x Tools/create-dmg/run.sh
           ./Tools/create-dmg/run.sh --no-internet-enable \
             --volname "Slippi Dolphin Beta Installer" \
             --volicon "Data/slippi_dmg_icon.icns" \
