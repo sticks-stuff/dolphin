@@ -275,7 +275,8 @@ jobs:
           libao \
           sound-touch \
           hidapi \
-          qt@6
+          qt@6 \
+          icu4c
       - name: "Build ${{ matrix.build_type }} Dolphin"
         shell: bash
         working-directory: ${{ github.workspace }}
@@ -303,7 +304,7 @@ jobs:
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
-          chmod +x Tools/create-dmg/run.sh 
+          chmod +x Tools/create-dmg/run.sh
           ./Tools/create-dmg/run.sh --no-internet-enable \
             --volname "Slippi Dolphin Beta Installer" \
             --volicon "Data/slippi_dmg_icon.icns" \
