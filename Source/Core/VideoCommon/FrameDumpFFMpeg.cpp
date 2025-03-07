@@ -203,6 +203,31 @@ bool FFMpegFrameDump::CreateVideoFile()
 
   File::CreateFullPath(dump_path);
 
+  void* iter = NULL;
+  auto nextFormat = av_muxer_iterate(&iter);
+  while (nextFormat)
+  {
+    ERROR_LOG_FMT(FRAMEDUMP, "Format: {}, {}", nextFormat->name, nextFormat->mime_type);
+    auto codecDescriptor = avcodec_descriptor_get(nextFormat->video_codec);
+    if (codecDescriptor)
+      ERROR_LOG_FMT(FRAMEDUMP, " Codec {}", codecDescriptor->name);
+    nextFormat = av_muxer_iterate(&iter);
+  }
+
+  iter = NULL;
+  auto nextEncoder = av_codec_iterate(&iter);
+  while (nextEncoder)
+  {
+    if (nextEncoder->type == AVMEDIA_TYPE_VIDEO && av_codec_is_encoder(nextEncoder))
+    {
+      ERROR_LOG_FMT(FRAMEDUMP, "Encoder: {}", nextEncoder->name);
+      auto codecDescriptor = avcodec_descriptor_get(nextEncoder->id);
+      if (codecDescriptor)
+        ERROR_LOG_FMT(FRAMEDUMP, " Codec {}", codecDescriptor->name);
+    }
+    nextEncoder = av_codec_iterate(&iter);
+  }
+
   auto* const output_format = av_guess_format(format.c_str(), dump_path.c_str(), nullptr);
   if (!output_format)
   {
