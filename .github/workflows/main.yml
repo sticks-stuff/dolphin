@@ -265,7 +265,7 @@ jobs:
           - os: macos-14
             arch: arm64
     name: "macOS ${{ matrix.arch }} ${{ matrix.build_type }}"
-    runs-on: macos-13
+    runs-on: ${{ matrix.os }}
     steps:
       - name: "Checkout"
         uses: actions/checkout@v4
