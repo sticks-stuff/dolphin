@@ -3,9 +3,9 @@ name: Builds
 on:
   push:
     branches:
-        - "**"
+      - "**"
     paths-ignore:
-        - "**.md"
+      - "**.md"
   pull_request:
     branches:
       - slippi
@@ -69,15 +69,15 @@ jobs:
       - name: "Install Rust"
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: ${{ steps.rust_ver.outputs.rust_ver }}  # Pin to our specific Rust version.
-          rustflags: ""  # Disable default injection of warnings = errors.
+          toolchain: ${{ steps.rust_ver.outputs.rust_ver }} # Pin to our specific Rust version.
+          rustflags: "" # Disable default injection of warnings = errors.
       - name: Cache Utils
         uses: actions/cache@v4
         with:
           path: |
             ./CodeSignTool/
           key: ${{ runner.os }}-${{ secrets.CACHE_CONTROL }}
-      - name: 'Fetch Git Tags'
+      - name: "Fetch Git Tags"
         shell: bash
         run: |
           git fetch --prune --unshallow
@@ -168,9 +168,9 @@ jobs:
       - name: "Install Rust"
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: ${{ steps.rust_ver.outputs.rust_ver }}  # Pin to our specific Rust version.
-          rustflags: ""  # Disable default injection of warnings = errors.
-      - name: 'Fetch Git Tags'
+          toolchain: ${{ steps.rust_ver.outputs.rust_ver }} # Pin to our specific Rust version.
+          rustflags: "" # Disable default injection of warnings = errors.
+      - name: "Fetch Git Tags"
         run: |
           git fetch --prune --unshallow
           echo "GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
@@ -252,6 +252,7 @@ jobs:
       fail-fast: false
       matrix:
         build_type: [Netplay, Playback]
+        os: [macos-13, macos-14]
         include:
           - build_type: Netplay
             artifact_name: mainline-macOS-netplay
@@ -259,7 +260,11 @@ jobs:
           - build_type: Playback
             artifact_name: mainline-macOS-playback
             build_config: playback
-    name: "macOS ${{ matrix.build_type }}"
+          - os: macos-13
+            arch: Intel
+          - os: macos-14
+            arch: arm64
+    name: "macOS ${{ matrix.arch }} ${{ matrix.build_type }}"
     runs-on: macos-13
     steps:
       - name: "Checkout"
@@ -273,9 +278,9 @@ jobs:
       - name: "Install Rust"
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: ${{ steps.rust_ver.outputs.rust_ver }}  # Pin to our specific Rust version.
-          rustflags: ""  # Disable default injection of warnings = errors.
-      - name: 'Fetch Git Tags'
+          toolchain: ${{ steps.rust_ver.outputs.rust_ver }} # Pin to our specific Rust version.
+          rustflags: "" # Disable default injection of warnings = errors.
+      - name: "Fetch Git Tags"
         run: |
           git fetch --prune --unshallow
           echo "GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
@@ -323,7 +328,7 @@ jobs:
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
-          chmod +x Tools/create-dmg/run.sh 
+          chmod +x Tools/create-dmg/run.sh
           ./Tools/create-dmg/run.sh --no-internet-enable \
             --volname "Slippi Dolphin Beta Installer" \
             --volicon "Data/slippi_dmg_icon.icns" \
@@ -353,7 +358,7 @@ jobs:
         if: success() || failure()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
+          name: ${{ matrix.artifact_name }}-${{ matrix.arch }}
           path: "./artifact/"
       #- name: "Enable Admin Debugging via SSH (if failed)"
       # if: failure()
