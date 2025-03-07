@@ -207,10 +207,12 @@ bool FFMpegFrameDump::CreateVideoFile()
   auto nextFormat = av_muxer_iterate(&iter);
   while (nextFormat)
   {
-    ERROR_LOG_FMT(FRAMEDUMP, "Format: {}, {}", nextFormat->name, nextFormat->mime_type);
     auto codecDescriptor = avcodec_descriptor_get(nextFormat->video_codec);
     if (codecDescriptor)
+    {
+      ERROR_LOG_FMT(FRAMEDUMP, "Format: {}", nextFormat->name);
       ERROR_LOG_FMT(FRAMEDUMP, " Codec {}", codecDescriptor->name);
+    }
     nextFormat = av_muxer_iterate(&iter);
   }
 
