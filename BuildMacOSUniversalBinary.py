@@ -322,7 +322,7 @@ def build(config):
                 "-DUSE_SYSTEM_ICONV=ON",
                 "-DUSE_SYSTEM_BZIP2=ON",
                 "-DUSE_SYSTEM_CURL=ON",
-                "-DSLIPPI_PLAYBACK=" + config["build_config"] == 'playback',
+                "-DSLIPPI_PLAYBACK=" + "true" if config["build_config"] == 'playback' else "false",
             ],
             env=env, cwd=arch)
 
