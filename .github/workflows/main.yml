@@ -252,7 +252,6 @@ jobs:
       fail-fast: false
       matrix:
         build_type: [Netplay, Playback]
-        os: [macos-13, macos-14]
         include:
           - build_type: Netplay
             artifact_name: mainline-macOS-netplay
@@ -260,12 +259,8 @@ jobs:
           - build_type: Playback
             artifact_name: mainline-macOS-playback
             build_config: playback
-          - os: macos-13
-            arch: Intel
-          - os: macos-14
-            arch: arm64
-    name: "macOS ${{ matrix.arch }} ${{ matrix.build_type }}"
-    runs-on: ${{ matrix.os }}
+    name: "macOS ${{ matrix.build_type }}"
+    runs-on: macos-14
     steps:
       - name: "Checkout"
         uses: actions/checkout@v4
@@ -278,6 +273,7 @@ jobs:
       - name: "Install Rust"
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
+          target: x86_64-apple-darwin
           toolchain: ${{ steps.rust_ver.outputs.rust_ver }} # Pin to our specific Rust version.
           rustflags: "" # Disable default injection of warnings = errors.
       - name: "Fetch Git Tags"
@@ -301,6 +297,15 @@ jobs:
           sound-touch \
           hidapi \
           qt@6
+          arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          arch -x86_64 brew install \
+          ffmpeg \
+          libpng \
+          pkgconfig \
+          libao \
+          sound-touch \
+          hidapi \
+          qt@6
       - name: "Build ${{ matrix.build_type }} Dolphin"
         shell: bash
         working-directory: ${{ github.workspace }}
@@ -308,7 +313,10 @@ jobs:
           CERTIFICATE_MACOS_APPLICATION: ${{ secrets.CERTIFICATE_MACOS_APPLICATION }}
         run: |
           export LIBRARY_PATH=$LIBRARY_PATH:/usr/local/lib
-          chmod +x ./build-mac.sh && ./build-mac.sh ${{ matrix.build_config }}
+          mkdir build
+          cd build
+          python3 ../BuildMacOSUniversalBinary.py --build_config ${{ matrix.build_config }}
+          cd ..
           mkdir artifact
           FILE_NAME=${{ env.CURR_DATE }}-${{ env.GIT_HASH }}-${{ env.GIT_TAG }}-${{ matrix.artifact_name }}
           echo "FILE_NAME=$FILE_NAME" >> $GITHUB_ENV
@@ -323,7 +331,7 @@ jobs:
           chmod +x Tools/load-macos-certs-ci.sh && ./Tools/load-macos-certs-ci.sh
           mkdir -p ~/private_keys/
           echo '${{ secrets.APPLE_CONNECT_API_KEY }}' > ~/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
-          /usr/bin/codesign -f -s "${{ secrets.APPLE_IDENTITY_HASH }}" --deep --options runtime --entitlements Source/Core/DolphinQt/DolphinEmu.entitlements ./build/Binaries/Slippi_Dolphin.app
+          /usr/bin/codesign -f -s "${{ secrets.APPLE_IDENTITY_HASH }}" --deep --options runtime --entitlements Source/Core/DolphinQt/DolphinEmu.entitlements ./build/universal/Slippi_Dolphin.app
       - name: "Package DMG"
         shell: bash
         working-directory: ${{ github.workspace }}
@@ -358,7 +366,7 @@ jobs:
         if: success() || failure()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}-${{ matrix.arch }}
+          name: ${{ matrix.artifact_name }}
           path: "./artifact/"
       #- name: "Enable Admin Debugging via SSH (if failed)"
       # if: failure()
