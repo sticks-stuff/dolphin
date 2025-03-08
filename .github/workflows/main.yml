@@ -349,7 +349,7 @@ jobs:
             --icon "Slippi_Dolphin.app" 140 196 \
             --hide-extension "Slippi_Dolphin.app" \
             "${{ env.FILE_NAME }}.dmg" \
-            "./build/Binaries/"
+            "./build/universal/"
           mv "${{ env.FILE_NAME }}.dmg" artifact/
       - name: "Sign and Notarize ${{ matrix.build_type }} Release DMG"
         if: env.CERTIFICATE_MACOS_APPLICATION != null
