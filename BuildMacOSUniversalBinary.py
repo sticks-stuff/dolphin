@@ -74,7 +74,10 @@ DEFAULT_CONFIG = {
     "autoupdate": False,
 
     # The distributor for this build.
-    "distributor": "None"
+    "distributor": "None",
+
+    # Slippi Dolphin build.
+    "build_config": "netplay"
 }
 
 # Architectures to build for. This is explicity left out of the command line
@@ -133,6 +136,12 @@ def parse_args(conf=DEFAULT_CONFIG):
         help="Code signing identity to use to sign the applications",
         default=conf["codesign_identity"],
         dest="codesign_identity")
+
+    parser.add_argument(
+        "--build_config",
+        help="Slippi Dolphin build [netplay, playback]",
+        default=conf["build_config"],
+        dest="build_config")
 
     for arch in ARCHITECTURES:
         parser.add_argument(
@@ -313,6 +322,7 @@ def build(config):
                 "-DUSE_SYSTEM_ICONV=ON",
                 "-DUSE_SYSTEM_BZIP2=ON",
                 "-DUSE_SYSTEM_CURL=ON",
+                "-DSLIPPI_PLAYBACK=" + config["build_config"] == 'playback',
             ],
             env=env, cwd=arch)
 
