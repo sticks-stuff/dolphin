@@ -166,8 +166,9 @@ def parse_args(conf=DEFAULT_CONFIG):
 def lipo(path0, path1, dst):
     if subprocess.call(["lipo", "-create", "-output", dst, path0, path1]) != 0:
         print(f"WARNING: {path0} and {path1} cannot be lipo'd")
-
         shutil.copy(path0, dst)
+    elif subprocess.call(["lipo", dst, "-verify_arch"] + ARCHITECTURES) != 0:
+        raise Exception(f"ERROR: {path0} and {path1} do not cover all architectures: {ARCHITECTURES}")
 
 
 def recursive_merge_binaries(src0, src1, dst):

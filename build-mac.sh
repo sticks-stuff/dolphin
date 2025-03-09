@@ -26,9 +26,15 @@ then
         CMAKE_FLAGS+=" -DMACOS_CODE_SIGNING=OFF"
 fi
 
+if [[ $(arch) == 'arm64' ]]; then
+  CMAKE_FLAGS+=" -DCMAKE_PREFIX_PATH=/opt/homebrew"
+elif [[ $(arch) == 'x86_64' ]]; then
+  CMAKE_FLAGS+=" -DCMAKE_PREFIX_PATH=/usr/local"
+fi
+
 # Move into the build directory, run CMake, and compile the project
-mkdir -p build
-pushd build
-cmake ${CMAKE_FLAGS} ..
+mkdir -p build/$(arch)
+pushd build/$(arch)
+cmake ${CMAKE_FLAGS} ../..
 cmake --build . --target dolphin-emu -- -j$(sysctl -n hw.ncpu)
 popd
