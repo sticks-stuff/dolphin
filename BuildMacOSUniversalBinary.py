@@ -171,7 +171,7 @@ def lipo(path0, path1, dst):
         raise Exception(f"ERROR: {path0} and {path1} do not cover all architectures: {ARCHITECTURES}")
 
 
-def recursive_merge_binaries(src0, src1, dst):
+def recursive_merge_binaries(src0, src1, dst, seen0: set, seen1: set):
     """
     Merges two build trees together for different architectures into a single
     universal binary.
@@ -212,25 +212,84 @@ def recursive_merge_binaries(src0, src1, dst):
                         "incompatible types. Perhaps the installed libraries" +
                         " are from different versions for each architecture")
 
+    # handle file symlinks in src0 first
     for newpath0 in glob.glob(src0+"/*"):
+        if not os.path.islink(newpath0):
+            continue
+
+        real_path_src0 = os.path.realpath(newpath0)
+        real_path_relative0 = os.path.relpath(real_path_src0, src0)
+        if os.path.isdir(real_path_src0):
+            continue
+
         filename = os.path.basename(newpath0)
         newpath1 = os.path.join(src1, filename)
+        real_path_dst = os.path.join(dst, real_path_relative0)
+        sym_path_dst = os.path.join(dst, filename)
+        if not os.path.exists(newpath1):
+            os.makedirs(os.path.dirname(real_path_dst), 511, True)
+            shutil.copy(real_path_src0, real_path_dst)
+            os.symlink(os.path.relpath(real_path_dst, dst), sym_path_dst)
+            seen0.add(os.path.relpath(real_path_src0, os.getcwd()))
+            continue
+
+        real_path_src1 = os.path.realpath(newpath1)
+        real_path_relative1 = os.path.relpath(real_path_src1, src1)
+        if real_path_relative0 != real_path_relative1:
+            real_basename0 = os.path.basename(real_path_src0)
+            real_basename1 = os.path.basename(real_path_src1)
+            real_path_dst = os.path.join(os.path.dirname(real_path_dst), ARCHITECTURES[0] + real_basename0 + ARCHITECTURES[1] + real_basename1)
+        os.makedirs(os.path.dirname(real_path_dst), 511, True)
+        if filecmp.cmp(real_path_src0, real_path_src1):
+            shutil.copy(real_path_src0, real_path_dst)
+        else:
+            lipo(real_path_src0, real_path_src1, real_path_dst)
+        os.symlink(os.path.relpath(real_path_dst, dst), sym_path_dst)
+        seen0.add(os.path.relpath(real_path_src0, os.getcwd()))
+        seen1.add(os.path.relpath(real_path_src1, os.getcwd()))
+
+    # pick up unique file symlinks in src1
+    for newpath1 in glob.glob(src1+"/*"):
+        if not os.path.islink(newpath1):
+            continue
+
+        real_path_src = os.path.realpath(newpath1)
+        real_path_relative = os.path.relpath(real_path_src, src1)
+        if os.path.isdir(real_path_src):
+            continue
+
+        filename = os.path.basename(newpath1)
+        newpath0 = os.path.join(src0, filename)
+        if os.path.exists(newpath0):
+            continue
+
+        real_path_dst = os.path.join(dst, real_path_relative)
+        sym_path_dst = os.path.join(dst, filename)
+        os.makedirs(os.path.dirname(real_path_dst), 511, True)
+        shutil.copy(real_path_src, real_path_dst)
+        os.symlink(os.path.relpath(real_path_dst, dst), sym_path_dst)
+        seen1.add(os.path.relpath(real_path_src1, os.getcwd()))
+
+    for newpath0 in glob.glob(src0+"/*"):
+        filename = os.path.basename(newpath0)
         new_dst_path = os.path.join(dst, filename)
         if os.path.islink(newpath0):
             # Symlinks will be fixed after files are resolved
             continue
+        if os.path.isfile(newpath0) and newpath0 in seen0:
+            continue
 
+        newpath1 = os.path.join(src1, filename)
         if not os.path.exists(newpath1):
             if os.path.isdir(newpath0):
                 shutil.copytree(newpath0, new_dst_path)
             else:
                 shutil.copy(newpath0, new_dst_path)
-
             continue
 
         if os.path.isdir(newpath1):
-            os.mkdir(new_dst_path)
-            recursive_merge_binaries(newpath0, newpath1, new_dst_path)
+            os.makedirs(new_dst_path, 511, True)
+            recursive_merge_binaries(newpath0, newpath1, new_dst_path, seen0, seen1)
             continue
 
         if filecmp.cmp(newpath0, newpath1):
@@ -241,9 +300,15 @@ def recursive_merge_binaries(src0, src1, dst):
     # Loop over files in src1 and copy missing things over to dst
     for newpath1 in glob.glob(src1+"/*"):
         filename = os.path.basename(newpath1)
-        newpath0 = os.path.join(src0, filename)
         new_dst_path = os.path.join(dst, filename)
-        if (not os.path.exists(newpath0)) and (not os.path.islink(newpath1)):
+        if os.path.islink(newpath1):
+            # Symlinks will be fixed after files are resolved
+            continue
+        if os.path.isfile(newpath1) and newpath1 in seen1:
+          continue
+
+        newpath0 = os.path.join(src0, filename)
+        if not os.path.exists(newpath0):
             if os.path.isdir(newpath1):
                 shutil.copytree(newpath1, new_dst_path)
             else:
@@ -253,7 +318,7 @@ def recursive_merge_binaries(src0, src1, dst):
     for newpath0 in glob.glob(src0+"/*"):
         filename = os.path.basename(newpath0)
         new_dst_path = os.path.join(dst, filename)
-        if os.path.islink(newpath0):
+        if os.path.islink(newpath0) and os.path.isdir(newpath0):
             relative_path = os.path.relpath(os.path.realpath(newpath0), src0)
             os.symlink(relative_path, new_dst_path)
     # Fix up symlinks for path1
@@ -261,7 +326,7 @@ def recursive_merge_binaries(src0, src1, dst):
         filename = os.path.basename(newpath1)
         new_dst_path = os.path.join(dst, filename)
         newpath0 = os.path.join(src0, filename)
-        if os.path.islink(newpath1) and not os.path.exists(newpath0):
+        if os.path.islink(newpath1) and os.path.isdir(newpath1) and not os.path.exists(newpath0):
             relative_path = os.path.relpath(os.path.realpath(newpath1), src1)
             os.symlink(relative_path, new_dst_path)
 
@@ -344,7 +409,7 @@ def build(config):
     src_app0 = ARCHITECTURES[0]+"/Binaries/"
     src_app1 = ARCHITECTURES[1]+"/Binaries/"
 
-    recursive_merge_binaries(src_app0, src_app1, dst_app)
+    recursive_merge_binaries(src_app0, src_app1, dst_app, set(), set())
 
     if config["autoupdate"]:
         subprocess.check_call([
