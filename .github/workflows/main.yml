@@ -283,29 +283,23 @@ jobs:
           echo "GIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
           echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
           echo "CURR_DATE=$(date +%Y-%m-%d)" >> $GITHUB_ENV
+      - name: "Install MacPorts"
+        uses: melusina-org/setup-macports@v1
       - name: "Download and Install prerequisites"
         shell: bash
         run: |
           rm '/usr/local/bin/2to3' || true
           echo "HOMEBREW_NO_AUTO_UPDATE=1" >> $GITHUB_ENV
           brew upgrade cmake
-          brew install \
-          ffmpeg \
-          libpng \
-          pkgconfig \
-          libao \
-          sound-touch \
-          hidapi \
-          qt@6
-          arch -arm64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          arch -arm64 /usr/local/bin/brew install \
-          ffmpeg \
-          libpng \
-          pkgconfig \
-          libao \
-          sound-touch \
-          hidapi \
-          qt@6
+          port install \
+          ffmpeg +universal \
+          libpng +universal \
+          pkgconfig +universal \
+          libao +universal \
+          soundtouch +universal \
+          hidapi +universal \
+          qt6 +universal
+          port contents qt6
       - name: "Build ${{ matrix.build_type }} Dolphin"
         shell: bash
         working-directory: ${{ github.workspace }}
@@ -315,7 +309,7 @@ jobs:
           export LIBRARY_PATH=$LIBRARY_PATH:/usr/local/lib
           mkdir build
           cd build
-          python3 ../BuildMacOSUniversalBinary.py --build_config ${{ matrix.build_config }}
+          python3 ../BuildMacOSUniversalBinary.py --build_config ${{ matrix.build_config }} --arm64_cmake_prefix /opt/local --x86_64_cmake_prefix /opt/local --arm64_qt6_path /opt/local --x86_64_qt6_path /opt/local
           cd ..
           mkdir artifact
           FILE_NAME=${{ env.CURR_DATE }}-${{ env.GIT_HASH }}-${{ env.GIT_TAG }}-${{ matrix.artifact_name }}
