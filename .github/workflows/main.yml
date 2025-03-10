@@ -273,7 +273,7 @@ jobs:
       - name: "Install Rust"
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          target: x86_64-apple-darwin
+          target: aarch64-apple-darwin
           toolchain: ${{ steps.rust_ver.outputs.rust_ver }} # Pin to our specific Rust version.
           rustflags: "" # Disable default injection of warnings = errors.
       - name: "Fetch Git Tags"
@@ -297,8 +297,8 @@ jobs:
           sound-touch \
           hidapi \
           qt@6
-          arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          arch -x86_64 /usr/local/bin/brew install \
+          arch -arm64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          arch -arm64 /usr/local/bin/brew install \
           ffmpeg \
           libpng \
           pkgconfig \
