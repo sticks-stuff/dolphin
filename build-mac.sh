@@ -3,11 +3,12 @@
 
 QT_BREW_PATH=$(brew --prefix qt@6)
 CMAKE_FLAGS="-DQT_DIR=${QT_BREW_PATH}/lib/cmake/Qt6 -DENABLE_NOGUI=false"
+ARCH=$(uname -m)
 
 # For some reason the system xxhash library doesn't get properly linked,
 # at least on my M1. The clang command gets -lxxhash, but probably needs
 # -L/opt/homebrew/lib/ to actually find the library.
-if [[ $(arch) == 'arm64' ]]; then
+if [[ "$ARCH" == 'arm64' ]]; then
   CMAKE_FLAGS+=" -DUSE_SYSTEM_XXHASH=OFF"
 fi
 export LIBRARY_PATH=$LIBRARY_PATH:/usr/local/lib:/usr/lib/
@@ -26,15 +27,15 @@ then
         CMAKE_FLAGS+=" -DMACOS_CODE_SIGNING=OFF"
 fi
 
-if [[ $(arch) == 'arm64' ]]; then
+if [[ "$ARCH" == 'arm64' ]]; then
   CMAKE_FLAGS+=" -DCMAKE_PREFIX_PATH=/opt/homebrew"
-elif [[ $(arch) == 'x86_64' ]]; then
+elif [[ "$ARCH" == 'x86_64' ]]; then
   CMAKE_FLAGS+=" -DCMAKE_PREFIX_PATH=/usr/local"
 fi
 
 # Move into the build directory, run CMake, and compile the project
-mkdir -p build/$(arch)
-pushd build/$(arch)
+mkdir -p build/$ARCH
+pushd build/$ARCH
 cmake ${CMAKE_FLAGS} ../..
 cmake --build . --target dolphin-emu -- -j$(sysctl -n hw.ncpu)
 popd
