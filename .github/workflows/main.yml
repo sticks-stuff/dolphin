@@ -273,9 +273,9 @@ jobs:
       - name: "Install Rust"
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: ${{ steps.rust_ver.outputs.rust_ver }}  # Pin to our specific Rust version.
-          rustflags: ""  # Disable default injection of warnings = errors.
-      - name: 'Fetch Git Tags'
+          toolchain: ${{ steps.rust_ver.outputs.rust_ver }} # Pin to our specific Rust version.
+          rustflags: "" # Disable default injection of warnings = errors.
+      - name: "Fetch Git Tags"
         run: |
           git fetch --prune --unshallow
           echo "GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
@@ -364,10 +364,10 @@ jobs:
         build_type: [Netplay, Playback]
         include:
           - build_type: Netplay
-            artifact_name: mainline-macOS-netplay
+            artifact_name: mainline-macOS-netplay-universal
             build_config: netplay
           - build_type: Playback
-            artifact_name: mainline-macOS-playback
+            artifact_name: mainline-macOS-playback-universal
             build_config: playback
     name: "macOS ${{ matrix.build_type }} universal"
     runs-on: macos-14
