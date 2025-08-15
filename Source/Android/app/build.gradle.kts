@@ -101,8 +101,12 @@ android {
     defaultConfig {
         externalNativeBuild {
             cmake {
-                arguments("-DANDROID_STL=c++_static", "-DCMAKE_BUILD_TYPE=RelWithDebInfo")
-                // , "-DENABLE_GENERIC=ON"
+                arguments(
+                    "-DANDROID_STL=c++_static",
+                    "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
+                    "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+                    // , "-DENABLE_GENERIC=ON"
+                )
                 abiFilters("arm64-v8a", "x86_64") //, "armeabi-v7a", "x86"
 
                 // Uncomment the line below if you don't want to build the C++ unit tests
@@ -148,6 +152,8 @@ dependencies {
 
     // For loading custom GPU drivers
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
     implementation("com.nononsenseapps:filepicker:4.2.1")
 }

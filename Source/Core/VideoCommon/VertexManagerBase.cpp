@@ -9,6 +9,7 @@
 
 #include "Common/ChunkFile.h"
 #include "Common/CommonTypes.h"
+#include "Common/Contains.h"
 #include "Common/EnumMap.h"
 #include "Common/Logging/Log.h"
 #include "Common/MathUtil.h"
@@ -155,7 +156,7 @@ DataReader VertexManagerBase::PrepareForAdditionalData(OpcodeDecoder::Primitive 
   u32 const needed_vertex_bytes = count * stride + 4;
 
   // We can't merge different kinds of primitives, so we have to flush here
-  PrimitiveType new_primitive_type = g_ActiveConfig.backend_info.bSupportsPrimitiveRestart ?
+  PrimitiveType new_primitive_type = g_backend_info.bSupportsPrimitiveRestart ?
                                          primitive_from_gx_pr[primitive] :
                                          primitive_from_gx[primitive];
   if (m_current_primitive_type != new_primitive_type) [[unlikely]]
@@ -242,7 +243,7 @@ u32 VertexManagerBase::GetRemainingIndices(OpcodeDecoder::Primitive primitive) c
   {
     if (g_Config.UseVSForLinePointExpand())
     {
-      if (g_Config.backend_info.bSupportsPrimitiveRestart)
+      if (g_backend_info.bSupportsPrimitiveRestart)
       {
         switch (primitive)
         {
@@ -286,7 +287,7 @@ u32 VertexManagerBase::GetRemainingIndices(OpcodeDecoder::Primitive primitive) c
       }
     }
   }
-  else if (g_Config.backend_info.bSupportsPrimitiveRestart)
+  else if (g_backend_info.bSupportsPrimitiveRestart)
   {
     switch (primitive)
     {
@@ -347,8 +348,7 @@ void VertexManagerBase::CommitBuffer(u32 num_vertices, u32 vertex_stride, u32 nu
 void VertexManagerBase::DrawCurrentBatch(u32 base_index, u32 num_indices, u32 base_vertex)
 {
   // If bounding box is enabled, we need to flush any changes first, then invalidate what we have.
-  if (g_bounding_box->IsEnabled() && g_ActiveConfig.bBBoxEnable &&
-      g_ActiveConfig.backend_info.bSupportsBBox)
+  if (g_bounding_box->IsEnabled() && g_ActiveConfig.bBBoxEnable && g_backend_info.bSupportsBBox)
   {
     g_bounding_box->Flush();
   }
@@ -558,7 +558,7 @@ void VertexManagerBase::Flush()
     pixel_shader_manager.constants.time_ms = seconds_elapsed * 1000;
   }
 
-  CalculateBinormals(VertexLoaderManager::GetCurrentVertexFormat());
+  CalculateNormals(VertexLoaderManager::GetCurrentVertexFormat());
   // Calculate ZSlope for zfreeze
   const auto used_textures = UsedTextures();
   std::vector<std::string> texture_names;
@@ -585,8 +585,7 @@ void VertexManagerBase::Flush()
         const auto cache_entry = g_texture_cache->Load(TextureInfo::FromStage(i));
         if (cache_entry)
         {
-          if (std::find(texture_names.begin(), texture_names.end(),
-                        cache_entry->texture_info_name) == texture_names.end())
+          if (!Common::Contains(texture_names, cache_entry->texture_info_name))
           {
             texture_names.push_back(cache_entry->texture_info_name);
             texture_units.push_back(i);
@@ -645,9 +644,6 @@ void VertexManagerBase::Flush()
     // Same with GPU texture decoding, which uses compute shaders.
     g_texture_cache->BindTextures(used_textures, samplers);
 
-    if (PerfQueryBase::ShouldEmulate())
-      g_perf_query->EnableQuery(bpmem.zcontrol.early_ztest ? PQG_ZCOMP_ZCOMPLOC : PQG_ZCOMP);
-
     if (!skip)
     {
       UpdatePipelineConfig();
@@ -669,14 +665,8 @@ void VertexManagerBase::Flush()
       }
     }
 
-    // Track the total emulated state draws
-    INCSTAT(g_stats.this_frame.num_draw_calls);
-
     // Even if we skip the draw, emulated state should still be impacted
     OnDraw();
-
-    if (PerfQueryBase::ShouldEmulate())
-      g_perf_query->DisableQuery(bpmem.zcontrol.early_ztest ? PQG_ZCOMP_ZCOMPLOC : PQG_ZCOMP);
 
     // The EFB cache is now potentially stale.
     g_framebuffer_manager->FlagPeekCacheAsOutOfDate();
@@ -699,6 +689,7 @@ void VertexManagerBase::DoState(PointerWrap& p)
   }
 
   p.Do(m_zslope);
+  p.Do(VertexLoaderManager::normal_cache);
   p.Do(VertexLoaderManager::tangent_cache);
   p.Do(VertexLoaderManager::binormal_cache);
 }
@@ -769,7 +760,7 @@ void VertexManagerBase::CalculateZSlope(NativeVertexFormat* format)
   m_zslope.dirty = true;
 }
 
-void VertexManagerBase::CalculateBinormals(NativeVertexFormat* format)
+void VertexManagerBase::CalculateNormals(NativeVertexFormat* format)
 {
   const PortableVertexDeclaration vert_decl = format->GetVertexDeclaration();
 
@@ -792,6 +783,16 @@ void VertexManagerBase::CalculateBinormals(NativeVertexFormat* format)
   if (vertex_shader_manager.constants.cached_binormal != VertexLoaderManager::binormal_cache)
   {
     vertex_shader_manager.constants.cached_binormal = VertexLoaderManager::binormal_cache;
+    vertex_shader_manager.dirty = true;
+  }
+
+  if (vert_decl.normals[0].enable)
+    return;
+
+  VertexLoaderManager::normal_cache[3] = 0;
+  if (vertex_shader_manager.constants.cached_normal != VertexLoaderManager::normal_cache)
+  {
+    vertex_shader_manager.constants.cached_normal = VertexLoaderManager::normal_cache;
     vertex_shader_manager.dirty = true;
   }
 }
@@ -954,8 +955,7 @@ void VertexManagerBase::OnDraw()
 
   // Check if this draw is scheduled to kick a command buffer.
   // The draw counters will always be sorted so a binary search is possible here.
-  if (std::binary_search(m_scheduled_command_buffer_kicks.begin(),
-                         m_scheduled_command_buffer_kicks.end(), m_draw_counter))
+  if (std::ranges::binary_search(m_scheduled_command_buffer_kicks, m_draw_counter))
   {
     // Kick a command buffer on the background thread.
     g_gfx->Flush();
@@ -1041,19 +1041,6 @@ void VertexManagerBase::OnEndFrame()
     }
   }
 
-#if 0
-  {
-    std::ostringstream ss;
-    std::for_each(m_cpu_accesses_this_frame.begin(), m_cpu_accesses_this_frame.end(), [&ss](u32 idx) { ss << idx << ","; });
-    WARN_LOG_FMT(VIDEO, "CPU EFB accesses in last frame: {}", ss.str());
-  }
-  {
-    std::ostringstream ss;
-    std::for_each(m_scheduled_command_buffer_kicks.begin(), m_scheduled_command_buffer_kicks.end(), [&ss](u32 idx) { ss << idx << ","; });
-    WARN_LOG_FMT(VIDEO, "Scheduled command buffer kicks: {}", ss.str());
-  }
-#endif
-
   m_cpu_accesses_this_frame.clear();
 
   // We invalidate the pipeline object at the start of the frame.
@@ -1093,8 +1080,7 @@ void VertexManagerBase::RenderDrawCall(
                VertexLoaderManager::GetCurrentVertexFormat()->GetVertexStride(),
                m_index_generator.GetIndexLen(), &base_vertex, &base_index);
 
-  if (g_ActiveConfig.backend_info.api_type != APIType::D3D &&
-      g_ActiveConfig.UseVSForLinePointExpand() &&
+  if (g_backend_info.api_type != APIType::D3D && g_ActiveConfig.UseVSForLinePointExpand() &&
       (primitive_type == PrimitiveType::Points || primitive_type == PrimitiveType::Lines))
   {
     // VS point/line expansion puts the vertex id at gl_VertexID << 2
@@ -1103,7 +1089,16 @@ void VertexManagerBase::RenderDrawCall(
     base_vertex <<= 2;
   }
 
+  if (PerfQueryBase::ShouldEmulate())
+    g_perf_query->EnableQuery(bpmem.zcontrol.early_ztest ? PQG_ZCOMP_ZCOMPLOC : PQG_ZCOMP);
+
   DrawCurrentBatch(base_index, m_index_generator.GetIndexLen(), base_vertex);
+
+  // Track the total emulated state draws
+  INCSTAT(g_stats.this_frame.num_draw_calls);
+
+  if (PerfQueryBase::ShouldEmulate())
+    g_perf_query->DisableQuery(bpmem.zcontrol.early_ztest ? PQG_ZCOMP_ZCOMPLOC : PQG_ZCOMP);
 }
 
 const AbstractPipeline* VertexManagerBase::GetCustomPipeline(
@@ -1134,7 +1129,7 @@ const AbstractPipeline* VertexManagerBase::GetCustomPipeline(
       {
         // D3D has issues compiling large custom ubershaders
         // use specialized shaders instead
-        if (g_ActiveConfig.backend_info.api_type == APIType::D3D)
+        if (g_backend_info.api_type == APIType::D3D)
         {
           if (auto pipeline = m_custom_shader_cache->GetPipelineAsync(
                   current_pipeline_config, custom_shaders, current_pipeline->m_config))

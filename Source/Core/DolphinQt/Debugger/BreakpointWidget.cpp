@@ -16,6 +16,7 @@
 #include <QToolBar>
 #include <QVBoxLayout>
 
+#include "Common/Contains.h"
 #include "Common/FileUtil.h"
 #include "Common/IniFile.h"
 #include "Core/ConfigManager.h"
@@ -28,6 +29,7 @@
 
 #include "DolphinQt/Debugger/BreakpointDialog.h"
 #include "DolphinQt/Debugger/MemoryWidget.h"
+#include "DolphinQt/Host.h"
 #include "DolphinQt/QtUtils/SetWindowDecorations.h"
 #include "DolphinQt/Resources.h"
 #include "DolphinQt/Settings.h"
@@ -130,6 +132,9 @@ BreakpointWidget::BreakpointWidget(QWidget* parent)
     Update();
   });
 
+  connect(Host::GetInstance(), &Host::PPCSymbolsChanged, this, &BreakpointWidget::Update);
+  connect(Host::GetInstance(), &Host::PPCBreakpointsChanged, this, &BreakpointWidget::Update);
+
   UpdateIcons();
 }
 
@@ -222,8 +227,7 @@ void BreakpointWidget::OnClicked(QTableWidgetItem* item)
     else
       m_system.GetPowerPC().GetBreakPoints().ToggleEnable(address);
 
-    emit BreakpointsChanged();
-    Update();
+    emit Host::GetInstance()->PPCBreakpointsChanged();
     return;
   }
 
@@ -254,9 +258,9 @@ void BreakpointWidget::UpdateButtonsEnabled()
   if (!isVisible())
     return;
 
-  const bool is_initialised = Core::GetState(m_system) != Core::State::Uninitialized;
-  m_load->setEnabled(is_initialised);
-  m_save->setEnabled(is_initialised);
+  const bool is_running = Core::IsRunning(m_system);
+  m_load->setEnabled(is_running);
+  m_save->setEnabled(is_running);
 }
 
 void BreakpointWidget::Update()
@@ -431,8 +435,7 @@ void BreakpointWidget::OnClear()
 
   m_table->setRowCount(0);
 
-  emit BreakpointsChanged();
-  Update();
+  emit Host::GetInstance()->PPCBreakpointsChanged();
 }
 
 void BreakpointWidget::OnNewBreakpoint()
@@ -462,8 +465,7 @@ void BreakpointWidget::OnEditBreakpoint(u32 address, bool is_instruction_bp)
     dialog->exec();
   }
 
-  emit BreakpointsChanged();
-  Update();
+  emit Host::GetInstance()->PPCBreakpointsChanged();
 }
 
 void BreakpointWidget::OnLoad()
@@ -492,8 +494,7 @@ void BreakpointWidget::OnLoad()
     memchecks.AddFromStrings(new_mcs);
   }
 
-  emit BreakpointsChanged();
-  Update();
+  emit Host::GetInstance()->PPCBreakpointsChanged();
 }
 
 void BreakpointWidget::OnSave()
@@ -522,27 +523,20 @@ void BreakpointWidget::OnContextMenu(const QPoint& pos)
   if (!is_memory_breakpoint)
   {
     const auto& inst_breakpoints = m_system.GetPowerPC().GetBreakPoints().GetBreakPoints();
-    const auto bp_iter =
-        std::find_if(inst_breakpoints.begin(), inst_breakpoints.end(),
-                     [bp_address](const auto& bp) { return bp.address == bp_address; });
-    if (bp_iter == inst_breakpoints.end())
+    if (!Common::Contains(inst_breakpoints, bp_address, &TBreakPoint::address))
       return;
 
     menu->addAction(tr("Show in Code"), [this, bp_address] { emit ShowCode(bp_address); });
     menu->addAction(tr("Edit..."), [this, bp_address] { OnEditBreakpoint(bp_address, true); });
     menu->addAction(tr("Delete"), [this, &bp_address]() {
       m_system.GetPowerPC().GetBreakPoints().Remove(bp_address);
-      emit BreakpointsChanged();
-      Update();
+      emit Host::GetInstance()->PPCBreakpointsChanged();
     });
   }
   else
   {
     const auto& memory_breakpoints = m_system.GetPowerPC().GetMemChecks().GetMemChecks();
-    const auto mb_iter =
-        std::find_if(memory_breakpoints.begin(), memory_breakpoints.end(),
-                     [bp_address](const auto& bp) { return bp.start_address == bp_address; });
-    if (mb_iter == memory_breakpoints.end())
+    if (!Common::Contains(memory_breakpoints, bp_address, &TMemCheck::start_address))
       return;
 
     menu->addAction(tr("Show in Memory"), [this, bp_address] { emit ShowMemory(bp_address); });
@@ -550,8 +544,7 @@ void BreakpointWidget::OnContextMenu(const QPoint& pos)
     menu->addAction(tr("Delete"), [this, &bp_address]() {
       const QSignalBlocker blocker(Settings::Instance());
       m_system.GetPowerPC().GetMemChecks().Remove(bp_address);
-      emit BreakpointsChanged();
-      Update();
+      emit Host::GetInstance()->PPCBreakpointsChanged();
     });
   }
 
@@ -615,8 +608,7 @@ void BreakpointWidget::AddBP(u32 addr, bool break_on_hit, bool log_on_hit, const
       addr, break_on_hit, log_on_hit,
       !condition.isEmpty() ? Expression::TryParse(condition.toUtf8().constData()) : std::nullopt);
 
-  emit BreakpointsChanged();
-  Update();
+  emit Host::GetInstance()->PPCBreakpointsChanged();
 }
 
 void BreakpointWidget::EditBreakpoint(u32 address, int edit, std::optional<QString> string)
@@ -650,8 +642,7 @@ void BreakpointWidget::EditBreakpoint(u32 address, int edit, std::optional<QStri
   m_system.GetPowerPC().GetBreakPoints().Remove(address);
   m_system.GetPowerPC().GetBreakPoints().Add(std::move(bp));
 
-  emit BreakpointsChanged();
-  Update();
+  emit Host::GetInstance()->PPCBreakpointsChanged();
 }
 
 void BreakpointWidget::AddAddressMBP(u32 addr, bool on_read, bool on_write, bool do_log,
@@ -673,8 +664,7 @@ void BreakpointWidget::AddAddressMBP(u32 addr, bool on_read, bool on_write, bool
     m_system.GetPowerPC().GetMemChecks().Add(std::move(check));
   }
 
-  emit BreakpointsChanged();
-  Update();
+  emit Host::GetInstance()->PPCBreakpointsChanged();
 }
 
 void BreakpointWidget::AddRangedMBP(u32 from, u32 to, bool on_read, bool on_write, bool do_log,
@@ -696,8 +686,7 @@ void BreakpointWidget::AddRangedMBP(u32 from, u32 to, bool on_read, bool on_writ
     m_system.GetPowerPC().GetMemChecks().Add(std::move(check));
   }
 
-  emit BreakpointsChanged();
-  Update();
+  emit Host::GetInstance()->PPCBreakpointsChanged();
 }
 
 void BreakpointWidget::EditMBP(u32 address, int edit, std::optional<QString> string)
@@ -754,6 +743,5 @@ void BreakpointWidget::EditMBP(u32 address, int edit, std::optional<QString> str
       m_system.GetPowerPC().GetMemChecks().Remove(address);
   }
 
-  emit BreakpointsChanged();
-  Update();
+  emit Host::GetInstance()->PPCBreakpointsChanged();
 }

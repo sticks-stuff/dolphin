@@ -6,6 +6,8 @@
 
 #include <mutex>
 
+#include <rcheevos/include/rc_error.h>
+
 #include <QDialogButtonBox>
 #include <QScrollArea>
 #include <QScrollBar>
@@ -36,9 +38,7 @@ AchievementsWindow::AchievementsWindow(QWidget* parent) : QDialog(parent)
         });
       });
   connect(&Settings::Instance(), &Settings::EmulationStateChanged, this,
-          [this] { m_settings_widget->UpdateData(); });
-  connect(&Settings::Instance(), &Settings::HardcoreStateChanged, this,
-          [this] { AchievementsWindow::UpdateData({.all = true}); });
+          [this] { m_settings_widget->UpdateData(RC_OK); });
 }
 
 void AchievementsWindow::showEvent(QShowEvent* event)
@@ -79,7 +79,7 @@ void AchievementsWindow::ConnectWidgets()
 
 void AchievementsWindow::UpdateData(AchievementManager::UpdatedItems updated_items)
 {
-  m_settings_widget->UpdateData();
+  m_settings_widget->UpdateData(updated_items.failed_login_code);
   if (updated_items.all)
   {
     m_header_widget->UpdateData();

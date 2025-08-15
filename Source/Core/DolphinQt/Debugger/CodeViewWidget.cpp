@@ -188,6 +188,8 @@ CodeViewWidget::CodeViewWidget()
   });
   connect(Host::GetInstance(), &Host::PPCSymbolsChanged, this,
           qOverload<>(&CodeViewWidget::Update));
+  connect(Host::GetInstance(), &Host::PPCBreakpointsChanged, this,
+          qOverload<>(&CodeViewWidget::Update));
 
   connect(&Settings::Instance(), &Settings::ThemeChanged, this,
           qOverload<>(&CodeViewWidget::Update));
@@ -431,13 +433,9 @@ void CodeViewWidget::CalculateBranchIndentation()
 
   // process in order of how much vertical space the drawn arrow would take up
   // so shorter arrows go further to the left
-  const auto priority = [](const CodeViewBranch& b) {
+  std::ranges::stable_sort(m_branches, {}, [](const CodeViewBranch& b) {
     return b.is_link ? 0 : (std::max(b.src_addr, b.dst_addr) - std::min(b.src_addr, b.dst_addr));
-  };
-  std::stable_sort(m_branches.begin(), m_branches.end(),
-                   [&priority](const CodeViewBranch& lhs, const CodeViewBranch& rhs) {
-                     return priority(lhs) < priority(rhs);
-                   });
+  });
 
   // build a 2D lookup table representing the columns and rows the arrow could be drawn in
   // and try to place all branch arrows in it as far left as possible
@@ -563,7 +561,7 @@ void CodeViewWidget::OnContextMenu()
   QMenu* menu = new QMenu(this);
   menu->setAttribute(Qt::WA_DeleteOnClose, true);
 
-  const bool running = Core::GetState(m_system) != Core::State::Uninitialized;
+  const bool running = Core::IsRunning(m_system);
   const bool paused = Core::GetState(m_system) == Core::State::Paused;
 
   const u32 addr = GetContextAddress();
@@ -879,7 +877,7 @@ void CodeViewWidget::OnPPCComparison()
 {
   const u32 addr = GetContextAddress();
 
-  emit RequestPPCComparison(addr);
+  emit RequestPPCComparison(addr, m_system.GetPPCState().msr.IR);
 }
 
 void CodeViewWidget::OnAddFunction()
@@ -1087,6 +1085,11 @@ void CodeViewWidget::keyPressEvent(QKeyEvent* event)
     m_address += rowCount() * sizeof(u32);
     Update();
     return;
+  case Qt::Key_G:
+    if (event->modifiers() == Qt::ControlModifier)
+    {
+      emit ActivateSearch();
+    }
   default:
     QWidget::keyPressEvent(event);
     break;
@@ -1139,16 +1142,14 @@ void CodeViewWidget::ToggleBreakpoint()
 {
   m_system.GetPowerPC().GetBreakPoints().ToggleBreakPoint(GetContextAddress());
 
-  emit BreakpointsChanged();
-  Update();
+  emit Host::GetInstance()->PPCBreakpointsChanged();
 }
 
 void CodeViewWidget::AddBreakpoint()
 {
   m_system.GetPowerPC().GetBreakPoints().Add(GetContextAddress());
 
-  emit BreakpointsChanged();
-  Update();
+  emit Host::GetInstance()->PPCBreakpointsChanged();
 }
 
 u32 CodeViewWidget::GetContextAddress() const

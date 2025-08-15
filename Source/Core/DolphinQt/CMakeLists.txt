@@ -52,6 +52,7 @@ add_executable(dolphin-emu
   Config/ConfigControls/ConfigBool.h
   Config/ConfigControls/ConfigChoice.cpp
   Config/ConfigControls/ConfigChoice.h
+  Config/ConfigControls/ConfigControl.h
   Config/ConfigControls/ConfigInteger.cpp
   Config/ConfigControls/ConfigInteger.h
   Config/ConfigControls/ConfigRadio.cpp
@@ -222,6 +223,8 @@ add_executable(dolphin-emu
   Debugger/CodeWidget.h
   Debugger/GekkoSyntaxHighlight.cpp
   Debugger/GekkoSyntaxHighlight.h
+  Debugger/JitBlockTableModel.cpp
+  Debugger/JitBlockTableModel.h
   Debugger/JITWidget.cpp
   Debugger/JITWidget.h
   Debugger/MemoryViewWidget.cpp
@@ -244,6 +247,8 @@ add_executable(dolphin-emu
   DiscordHandler.h
   DiscordJoinRequestDialog.cpp
   DiscordJoinRequestDialog.h
+  EmulatedUSB/WiiSpeakWindow.cpp
+  EmulatedUSB/WiiSpeakWindow.h
   FIFO/FIFOAnalyzer.cpp
   FIFO/FIFOAnalyzer.h
   FIFO/FIFOPlayerWindow.cpp
@@ -297,6 +302,7 @@ add_executable(dolphin-emu
   QtUtils/BlockUserInputFilter.h
   QtUtils/ClearLayoutRecursively.cpp
   QtUtils/ClearLayoutRecursively.h
+  QtUtils/ClickableStatusBar.h
   QtUtils/DolphinFileDialog.cpp
   QtUtils/DolphinFileDialog.h
   QtUtils/DoubleClickEventFilter.cpp
@@ -310,11 +316,15 @@ add_executable(dolphin-emu
   QtUtils/ImageConverter.h
   QtUtils/ModalMessageBox.cpp
   QtUtils/ModalMessageBox.h
+  QtUtils/NonAutodismissibleMenu.cpp
+  QtUtils/NonAutodismissibleMenu.h
   QtUtils/NonDefaultQPushButton.cpp
   QtUtils/NonDefaultQPushButton.h
   QtUtils/ParallelProgressDialog.h
   QtUtils/PartiallyClosableTabWidget.cpp
   QtUtils/PartiallyClosableTabWidget.h
+  QtUtils/QtUtils.cpp
+  QtUtils/QtUtils.h
   QtUtils/SetWindowDecorations.cpp
   QtUtils/SetWindowDecorations.h
   QtUtils/SignalBlocking.h
@@ -408,6 +418,9 @@ PRIVATE
   -DQT_USE_QSTRINGBUILDER
   -DQT_NO_CAST_FROM_ASCII
   -DQT_NO_CAST_TO_ASCII
+  # This Qt version should match Externals/Qt.
+  # It disables deprecation warnings we can't fix yet.
+  -DQT_WARN_DEPRECATED_UP_TO=0x060501
 )
 
 target_include_directories(dolphin-emu
@@ -483,21 +496,9 @@ if(WIN32)
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/qt.conf.win" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/qt.conf"
   )
 
-  string(TOLOWER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE_LOWER)
-
-  # Copy Rust DLLs
-  add_custom_command(TARGET dolphin-emu POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_BINARY_DIR}/cargo/build/x86_64-pc-windows-msvc/${CMAKE_BUILD_TYPE_LOWER}/slippi_rust_extensions.dll" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/slippi_rust_extensions.dll"
-  )
-
-  add_custom_command(TARGET dolphin-emu POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_BINARY_DIR}/cargo/build/x86_64-pc-windows-msvc/${CMAKE_BUILD_TYPE_LOWER}/slippi_rust_extensions.dll.lib" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/slippi_rust_extensions.dll.lib"
-  )
-
-  # Copy Rust PDB (should not go out in releases)
-  add_custom_command(TARGET dolphin-emu POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_BINARY_DIR}/cargo/build/x86_64-pc-windows-msvc/${CMAKE_BUILD_TYPE_LOWER}/slippi_rust_extensions.pdb" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/slippi_rust_extensions.pdb"
-  )
+  # slippi change
+  add_dependencies(dolphin-emu copy_rust_dll)
+  # end slippi change
 
   # create portable.txt automatically for Windows since we always use portable builds for dev and release
   add_custom_command(TARGET dolphin-emu POST_BUILD
@@ -602,9 +603,10 @@ if(APPLE)
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in"
     XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${CMAKE_CURRENT_SOURCE_DIR}/DolphinEmu.entitlements"
     XCODE_ATTRIBUTE_OTHER_CODE_SIGN_FLAGS "--deep --options=runtime"
+    XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY ""
     OUTPUT_NAME "${OUTPUT_NAME}"
     )
-  # slippi change: end
+  # end slippi change
 
   # Copy qt.conf into the bundle
   target_sources(dolphin-emu PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/qt.conf")
@@ -637,6 +639,9 @@ if(APPLE)
       MACOSX_PACKAGE_LOCATION "Resources/${resdir}")
     source_group("Resources" FILES "${CMAKE_SOURCE_DIR}/Data/${res}")
   endforeach()
+
+  include(DolphinInjectVersionInfo)
+  dolphin_inject_version_info(dolphin-emu)
 
   # Copy MoltenVK into the bundle
   if(ENABLE_VULKAN)
@@ -681,8 +686,13 @@ if(APPLE)
     # add_custom_command(TARGET dolphin-emu
     #   POST_BUILD COMMAND
     #   /usr/bin/codesign -f -s "${MACOS_CODE_SIGNING_IDENTITY}" --deep --options=runtime --entitlements "${CMAKE_SOURCE_DIR}/Source/Core/DolphinQt/DolphinEmu.entitlements" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE}/${OUTPUT_NAME}.app" || true)
-    add_custom_command(TARGET dolphin-emu POST_BUILD
-      COMMAND /usr/bin/codesign -f -s "${MACOS_CODE_SIGNING_IDENTITY}" --deep --options=runtime --entitlements "${CMAKE_SOURCE_DIR}/Source/Core/DolphinQt/DolphinEmu$<$<CONFIG:Debug>:Debug>.entitlements" "$<TARGET_BUNDLE_DIR:dolphin-emu>")
+    add_custom_command(TARGET dolphin-emu
+      POST_BUILD
+      COMMAND "${CMAKE_SOURCE_DIR}/Tools/mac-codesign.sh"
+      "-e" "${CMAKE_CURRENT_SOURCE_DIR}/DolphinEmu$<$<CONFIG:Debug>:Debug>.entitlements"
+      "${MACOS_CODE_SIGNING_IDENTITY}"
+      "$<TARGET_BUNDLE_DIR:dolphin-emu>"
+    )
   endif()
 else()
   install(TARGETS dolphin-emu RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -717,4 +727,7 @@ endif()
 if(USE_RETRO_ACHIEVEMENTS)
   target_link_libraries(dolphin-emu PRIVATE rcheevos)
   target_compile_definitions(dolphin-emu PRIVATE -DUSE_RETRO_ACHIEVEMENTS)
+  if(RC_CLIENT_SUPPORTS_RAINTEGRATION)
+    target_compile_definitions(dolphin-emu PRIVATE -DRC_CLIENT_SUPPORTS_RAINTEGRATION)
+  endif()
 endif()

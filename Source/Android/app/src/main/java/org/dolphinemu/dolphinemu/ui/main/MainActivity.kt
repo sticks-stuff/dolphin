@@ -9,14 +9,13 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup.MarginLayoutParams
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.ViewCompat
-import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout.OnRefreshListener
 import com.google.android.material.appbar.AppBarLayout
-import com.google.android.material.color.MaterialColors
 import com.google.android.material.tabs.TabLayout
 import org.dolphinemu.dolphinemu.R
 import org.dolphinemu.dolphinemu.activities.EmulationActivity
@@ -28,8 +27,8 @@ import org.dolphinemu.dolphinemu.features.settings.ui.MenuTag
 import org.dolphinemu.dolphinemu.features.settings.ui.SettingsActivity
 import org.dolphinemu.dolphinemu.fragments.GridOptionDialogFragment
 import org.dolphinemu.dolphinemu.services.GameFileCacheManager
-import org.dolphinemu.dolphinemu.ui.platform.Platform
 import org.dolphinemu.dolphinemu.ui.platform.PlatformGamesView
+import org.dolphinemu.dolphinemu.ui.platform.PlatformTab
 import org.dolphinemu.dolphinemu.utils.Action1
 import org.dolphinemu.dolphinemu.utils.AfterDirectoryInitializationRunner
 import org.dolphinemu.dolphinemu.utils.DirectoryInitialization
@@ -53,13 +52,13 @@ class MainActivity : AppCompatActivity(), MainView, OnRefreshListener, ThemeProv
         installSplashScreen().setKeepOnScreenCondition { !DirectoryInitialization.areDolphinDirectoriesReady() }
 
         ThemeHelper.setTheme(this)
+        enableEdgeToEdge()
 
         super.onCreate(savedInstanceState)
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        WindowCompat.setDecorFitsSystemWindows(window, false)
         setInsets()
         ThemeHelper.enableStatusBarScrollTint(this, binding.appbarMain)
 
@@ -104,11 +103,6 @@ class MainActivity : AppCompatActivity(), MainView, OnRefreshListener, ThemeProv
         presenter.onResume()
     }
 
-    override fun onStart() {
-        super.onStart()
-        StartupHandler.checkSessionReset(this)
-    }
-
     override fun onStop() {
         super.onStop()
         if (isChangingConfigurations) {
@@ -117,8 +111,6 @@ class MainActivity : AppCompatActivity(), MainView, OnRefreshListener, ThemeProv
             // If the currently selected platform tab changed, save it to disk
             NativeConfig.save(NativeConfig.LAYER_BASE)
         }
-
-        StartupHandler.setSessionTime(this)
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -266,17 +258,17 @@ class MainActivity : AppCompatActivity(), MainView, OnRefreshListener, ThemeProv
         GridOptionDialogFragment().show(supportFragmentManager, "gridOptions")
 
     private fun forEachPlatformGamesView(action: Action1<PlatformGamesView>) {
-        for (platform in Platform.values()) {
-            val fragment = getPlatformGamesView(platform)
+        for (platformTab in PlatformTab.values()) {
+            val fragment = getPlatformGamesView(platformTab)
             if (fragment != null) {
                 action.call(fragment)
             }
         }
     }
 
-    private fun getPlatformGamesView(platform: Platform): PlatformGamesView? {
+    private fun getPlatformGamesView(platformTab: PlatformTab): PlatformGamesView? {
         val fragmentTag =
-            "android:switcher:" + binding.pagerPlatforms.id + ":" + platform.toInt()
+            "android:switcher:" + binding.pagerPlatforms.id + ":" + platformTab.toInt()
         return supportFragmentManager.findFragmentByTag(fragmentTag) as PlatformGamesView?
     }
 
@@ -330,10 +322,6 @@ class MainActivity : AppCompatActivity(), MainView, OnRefreshListener, ThemeProv
             binding.pagerPlatforms.setPadding(insets.left, 0, insets.right, 0)
 
             InsetsHelper.applyNavbarWorkaround(insets.bottom, binding.workaroundView)
-            ThemeHelper.setNavigationBarColor(
-                this,
-                MaterialColors.getColor(binding.appbarMain, R.attr.colorSurface)
-            )
 
             windowInsets
         }

@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <iosfwd>
 #include <memory>
 #include "Common/CommonTypes.h"
 
@@ -107,8 +106,12 @@ enum SIDevices : int
   SIDEVICE_COUNT,
 };
 
-std::ostream& operator<<(std::ostream& stream, SIDevices device);
-std::istream& operator>>(std::istream& stream, SIDevices& device);
+enum class DataResponse
+{
+  NoData,
+  Success,
+  ErrorNoResponse,
+};
 
 class ISIDevice
 {
@@ -123,8 +126,7 @@ public:
   virtual int RunBuffer(u8* buffer, int request_length);
   virtual int TransferInterval();
 
-  // Return true on new data
-  virtual bool GetData(u32& hi, u32& low) = 0;
+  virtual DataResponse GetData(u32& hi, u32& low) = 0;
 
   // Send a command directly (no detour per buffer)
   virtual void SendCommand(u32 command, u8 poll) = 0;

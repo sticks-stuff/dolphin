@@ -73,7 +73,7 @@ void Statistics::Display() const
     ImGui::NextColumn();
   };
 
-  if (g_ActiveConfig.backend_info.api_type == APIType::Nothing)
+  if (g_backend_info.api_type == APIType::Nothing)
   {
     draw_statistic("Objects", "%d", this_frame.num_drawn_objects);
     draw_statistic("Vertices Loaded", "%d", this_frame.num_vertices_loaded);
@@ -176,7 +176,7 @@ void Statistics::AddScissorRect()
     }
     else
     {
-      add = std::find_if(scissors.begin(), scissors.end(), [&](auto& s) {
+      add = std::ranges::find_if(scissors, [&](auto& s) {
               return s.Matches(scissor, show_scissors, show_viewports);
             }) == scissors.end();
     }

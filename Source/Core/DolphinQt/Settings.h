@@ -10,6 +10,7 @@
 #include <QRadioButton>
 #include <QSettings>
 
+#include "Common/Config/Config.h"
 #include "Core/Config/MainSettings.h"
 #include "DiscIO/Enums.h"
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
@@ -53,8 +54,6 @@ public:
   // UI
   void TriggerThemeChanged();
   void InitDefaultPalette();
-  void UpdateSystemDark();
-  void SetSystemDark(bool dark);
   bool IsSystemDark();
   bool IsThemeDark();
 
@@ -122,6 +121,9 @@ public:
   void SetSDCardInserted(bool inserted);
   bool IsUSBKeyboardConnected() const;
   void SetUSBKeyboardConnected(bool connected);
+
+  bool IsWiiSpeakMuted() const;
+  void SetWiiSpeakMuted(bool muted);
 
   void SetIsContinuouslyFrameStepping(bool is_stepping);
   bool GetIsContinuouslyFrameStepping() const;
@@ -202,7 +204,6 @@ signals:
   void CursorVisibilityChanged();
   void LockCursorChanged();
   void KeepWindowOnTopChanged(bool top);
-  void VolumeChanged(int volume);
   void NANDRefresh();
   void RegistersVisibilityChanged(bool visible);
   void ThreadsVisibilityChanged(bool visible);
@@ -227,8 +228,8 @@ signals:
   void DevicesChanged();
   void SDCardInsertionChanged(bool inserted);
   void USBKeyboardConnectionChanged(bool connected);
+  void WiiSpeakMuteChanged(bool muted);
   void EnableGfxModsChanged(bool enabled);
-  void HardcoreStateChanged();
 
 private:
   Settings();
@@ -239,6 +240,7 @@ private:
   std::shared_ptr<NetPlay::NetPlayClient> m_client;
   std::shared_ptr<NetPlay::NetPlayServer> m_server;
   ControllerInterface::HotplugCallbackHandle m_hotplug_callback_handle;
+  Config::ConfigChangedCallbackID m_config_changed_callback_id;
 };
 
 Q_DECLARE_METATYPE(Core::State);

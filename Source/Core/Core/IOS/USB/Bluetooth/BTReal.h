@@ -23,6 +23,7 @@
 class PointerWrap;
 struct libusb_device;
 struct libusb_device_handle;
+struct libusb_device_descriptor;
 struct libusb_transfer;
 
 namespace IOS::HLE
@@ -56,6 +57,17 @@ public:
 
   void HandleCtrlTransfer(libusb_transfer* finished_transfer);
   void HandleBulkOrIntrTransfer(libusb_transfer* finished_transfer);
+
+  static bool IsConfiguredBluetoothDevice(u16 vid, u16 pid);
+
+  struct BluetoothDeviceInfo
+  {
+    u16 vid;
+    u16 pid;
+    std::string name;
+  };
+
+  static std::vector<BluetoothDeviceInfo> ListDevices();
 
 private:
   static constexpr u8 INTERFACE = 0x00;
@@ -116,7 +128,7 @@ private:
   void LoadLinkKeys();
   void SaveLinkKeys();
 
-  bool OpenDevice(libusb_device* device);
+  bool OpenDevice(const libusb_device_descriptor& device_descriptor, libusb_device* device);
 };
 }  // namespace IOS::HLE
 

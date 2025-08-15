@@ -27,17 +27,14 @@ USB_HIDv4::USB_HIDv4(EmulationKernel& ios, const std::string& device_name)
 {
 }
 
-USB_HIDv4::~USB_HIDv4()
-{
-  m_scan_thread.Stop();
-}
+USB_HIDv4::~USB_HIDv4() = default;
 
 std::optional<IPCReply> USB_HIDv4::IOCtl(const IOCtlRequest& request)
 {
   auto& system = GetSystem();
   auto& memory = system.GetMemory();
 
-  request.Log(GetDeviceName(), Common::Log::LogType::IOS_USB);
+  request.Log(GetDeviceName(), Common::Log::LogType::IOS_USB, Common::Log::LogLevel::LDEBUG);
   switch (request.request)
   {
   case USB::IOCTL_USBV4_GETVERSION:
@@ -96,10 +93,11 @@ std::optional<IPCReply> USB_HIDv4::GetDeviceChange(const IOCtlRequest& request)
   m_devicechange_hook_request = std::make_unique<IOCtlRequest>(GetSystem(), request.address);
   // If there are pending changes, the reply is sent immediately (instead of on device
   // insertion/removal).
-  if (m_has_pending_changes)
+  if (m_has_pending_changes || m_is_shut_down)
   {
     TriggerDeviceChangeReply();
     m_has_pending_changes = false;
+    m_is_shut_down = false;
   }
   return std::nullopt;
 }
@@ -114,6 +112,7 @@ IPCReply USB_HIDv4::Shutdown(const IOCtlRequest& request)
     memory.Write_U32(0xffffffff, m_devicechange_hook_request->buffer_out);
     GetEmulationKernel().EnqueueIPCReply(*m_devicechange_hook_request, -1);
     m_devicechange_hook_request.reset();
+    m_is_shut_down = true;
   }
   return IPCReply(IPC_SUCCESS);
 }

@@ -174,10 +174,12 @@ static void RemoveBreakpoint(BreakpointType type, u32 addr, u32 len)
     auto& memchecks = Core::System::GetInstance().GetPowerPC().GetMemChecks();
     while (memchecks.GetMemCheck(addr, len) != nullptr)
     {
-      memchecks.Remove(addr);
+      memchecks.Remove(addr, false);
       INFO_LOG_FMT(GDB_STUB, "gdb: removed a memcheck: {:08x} bytes at {:08x}", len, addr);
     }
+    memchecks.Update();
   }
+  Host_PPCBreakpointsChanged();
 }
 
 static void Nack()
@@ -258,7 +260,7 @@ static void ReadCommand()
 
 static bool IsDataAvailable()
 {
-  struct timeval t;
+  timeval t;
   fd_set _fds, *fds = &_fds;
 
   FD_ZERO(fds);
@@ -866,7 +868,7 @@ static void Step()
 {
   auto& system = Core::System::GetInstance();
   system.GetCPU().SetStepping(true);
-  Core::CallOnStateChangedCallbacks(Core::State::Paused);
+  Core::NotifyStateChanged(Core::State::Paused);
 }
 
 static bool AddBreakpoint(BreakpointType type, u32 addr, u32 len)
@@ -896,6 +898,7 @@ static bool AddBreakpoint(BreakpointType type, u32 addr, u32 len)
     INFO_LOG_FMT(GDB_STUB, "gdb: added {} memcheck: {:08x} bytes at {:08x}", static_cast<int>(type),
                  len, addr);
   }
+  Host_PPCBreakpointsChanged();
   return true;
 }
 

@@ -50,15 +50,16 @@
 #include "UICommon/DiscordPresence.h"
 #include "UICommon/USBUtils.h"
 
-#ifdef HAVE_X11
-#include "UICommon/X11Utils.h"
+#include "VideoCommon/VideoBackendBase.h"
+#include "VideoCommon/VideoConfig.h"
+
+#ifdef HAVE_QTDBUS
+#include "UICommon/DBusUtils.h"
 #endif
 
 #ifdef __APPLE__
 #include <IOKit/pwr_mgt/IOPMLib.h>
 #endif
-
-#include "VideoCommon/VideoBackendBase.h"
 
 namespace UICommon
 {
@@ -130,14 +131,17 @@ void Init()
   Core::RestoreWiiSettings(Core::RestoreReason::CrashRecovery);
 
   Config::Init();
-  Config::AddConfigChangedCallback(InitCustomPaths);
+  const auto config_changed_callback = []() {
+    InitCustomPaths();
+    RefreshConfig();
+  };
+  s_config_changed_callback_id = Config::AddConfigChangedCallback(config_changed_callback);
   Config::AddLayer(ConfigLoaders::GenerateBaseConfigLoader());
   SConfig::Init();
   Discord::Init();
   Common::Log::LogManager::Init();
   VideoBackendBase::ActivateBackend(Config::Get(Config::MAIN_GFX_BACKEND));
 
-  s_config_changed_callback_id = Config::AddConfigChangedCallback(RefreshConfig);
   RefreshConfig();
 }
 
@@ -149,6 +153,7 @@ void Shutdown()
   WiimoteReal::Shutdown();
   Common::Log::LogManager::Shutdown();
   Discord::Shutdown();
+  g_Config.Shutdown();
   SConfig::Shutdown();
   Config::Shutdown();
 }
@@ -225,7 +230,7 @@ void SetLocale(std::string locale_name)
   if (locale_name == "en")
     locale_name = "en_GB";
 
-  std::replace(locale_name.begin(), locale_name.end(), OTHER_SEPARATOR, PREFERRED_SEPARATOR);
+  std::ranges::replace(locale_name, OTHER_SEPARATOR, PREFERRED_SEPARATOR);
 
   // Use the specified locale if supported.
   if (set_locale(locale_name))
@@ -517,17 +522,13 @@ bool TriggerSTMPowerEvent()
   return true;
 }
 
-#ifdef HAVE_X11
-void InhibitScreenSaver(Window win, bool inhibit)
-#else
 void InhibitScreenSaver(bool inhibit)
-#endif
 {
   // Inhibit the screensaver. Depending on the operating system this may also
   // disable low-power states and/or screen dimming.
 
-#ifdef HAVE_X11
-  X11Utils::InhibitScreensaver(win, inhibit);
+#ifdef HAVE_QTDBUS
+  DBusUtils::InhibitScreenSaver(inhibit);
 #endif
 
 #ifdef _WIN32

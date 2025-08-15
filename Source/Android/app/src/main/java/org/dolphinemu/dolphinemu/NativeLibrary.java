@@ -12,6 +12,7 @@ import android.view.Surface;
 import android.widget.Toast;
 
 import androidx.annotation.Keep;
+import androidx.core.util.Pair;
 import androidx.fragment.app.FragmentManager;
 
 import org.dolphinemu.dolphinemu.activities.EmulationActivity;
@@ -20,7 +21,6 @@ import org.dolphinemu.dolphinemu.utils.CompressCallback;
 import org.dolphinemu.dolphinemu.utils.Log;
 
 import java.lang.ref.WeakReference;
-import java.util.LinkedHashMap;
 import java.util.concurrent.Semaphore;
 
 /**
@@ -302,7 +302,7 @@ public final class NativeLibrary
 
   public static native int DefaultCPUCore();
 
-  public static native String GetDefaultGraphicsBackendName();
+  public static native String GetDefaultGraphicsBackendConfigName();
 
   public static native int GetMaxLogLevel();
 
@@ -381,9 +381,20 @@ public final class NativeLibrary
    */
   public static native boolean IsRunning();
 
-  public static native boolean IsRunningAndStarted();
-
+  /**
+   * Returns true if emulation is running and not paused.
+   */
   public static native boolean IsRunningAndUnpaused();
+
+  /**
+   * Returns true if emulation is fully shut down.
+   */
+  public static native boolean IsUninitialized();
+
+  /**
+   * Re-initialize software JitBlock profiling data
+   */
+  public static native void WipeJitBlockProfilingData();
 
   /**
    * Writes out the JitBlock Cache log dump
@@ -400,7 +411,7 @@ public final class NativeLibrary
    */
   public static native void RefreshWiimotes();
 
-  public static native LinkedHashMap<String, String> GetLogTypeNames();
+  public static native Pair<String, String>[] GetLogTypeNames();
 
   public static native void ReloadLoggerConfig();
 

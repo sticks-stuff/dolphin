@@ -109,7 +109,18 @@ public:
 protected:
   u8 ReadMemory(u32 address) override { return Host::ReadHostMemory(address); }
   void WriteMemory(u32 address, u8 value) override { Host::WriteHostMemory(value, address); }
-  void OnEndException() override { m_dsp.SetException(ExceptionType::AcceleratorOverflow); }
+  void OnRawReadEndException() override
+  {
+    m_dsp.SetException(ExceptionType::AcceleratorRawReadOverflow);
+  }
+  void OnRawWriteEndException() override
+  {
+    m_dsp.SetException(ExceptionType::AcceleratorRawWriteOverflow);
+  }
+  void OnSampleReadEndException() override
+  {
+    m_dsp.SetException(ExceptionType::AcceleratorSampleReadOverflow);
+  }
 
 private:
   SDSP& m_dsp;
@@ -143,20 +154,20 @@ bool SDSP::Initialize(const DSPInitOptions& opts)
 
   std::memset(&r, 0, sizeof(r));
 
-  std::fill(std::begin(reg_stack_ptrs), std::end(reg_stack_ptrs), 0);
+  std::ranges::fill(reg_stack_ptrs, 0);
 
   for (auto& stack : reg_stacks)
-    std::fill(std::begin(stack), std::end(stack), 0);
+    std::ranges::fill(stack, 0);
 
   // Fill IRAM with HALT opcodes.
-  std::fill(iram, iram + DSP_IRAM_SIZE, 0x0021);
+  std::ranges::fill_n(iram, DSP_IRAM_SIZE, 0x0021);
 
   // Just zero out DRAM.
-  std::fill(dram, dram + DSP_DRAM_SIZE, 0);
+  std::ranges::fill_n(dram, DSP_DRAM_SIZE, 0);
 
   // Copied from a real console after the custom UCode has been loaded.
   // These are the indexing wrapping registers.
-  std::fill(std::begin(r.wr), std::end(r.wr), 0xffff);
+  std::ranges::fill(r.wr, 0xffff);
 
   r.sr |= SR_INT_ENABLE;
   r.sr |= SR_EXT_INT_ENABLE;
@@ -172,7 +183,7 @@ bool SDSP::Initialize(const DSPInitOptions& opts)
 void SDSP::Reset()
 {
   pc = DSP_RESET_VECTOR;
-  std::fill(std::begin(r.wr), std::end(r.wr), 0xffff);
+  std::ranges::fill(r.wr, 0xffff);
 }
 
 void SDSP::Shutdown()

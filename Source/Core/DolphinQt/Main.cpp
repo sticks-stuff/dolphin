@@ -149,6 +149,14 @@ int main(int argc, char* argv[])
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 3, 0))
   setenv("QT_XCB_NO_XI2", "1", true);
 #endif
+  // Dolphin currently doesn't work on Wayland (Only the UI does, games do not launch.) This makes
+  // XCB the default and forces it on if the platform is specified to be wayland, to prevent this
+  // from happening.
+  // For more information: https://bugs.dolphin-emu.org/issues/11807
+  const char* current_qt_platform = getenv("QT_QPA_PLATFORM");
+  const bool replace_qt_platform =
+      (current_qt_platform && strcasecmp(current_qt_platform, "wayland") == 0);
+  setenv("QT_QPA_PLATFORM", "xcb", replace_qt_platform);
 #endif
 
   QCoreApplication::setOrganizationName(QStringLiteral("Dolphin Emulator"));
@@ -262,10 +270,10 @@ int main(int argc, char* argv[])
 #endif
 
     Settings::Instance().InitDefaultPalette();
-    Settings::Instance().UpdateSystemDark();
     Settings::Instance().ApplyStyle();
 
-    MainWindow win{std::move(boot), static_cast<const char*>(options.get("movie"))};
+    MainWindow win{Core::System::GetInstance(), std::move(boot),
+                   static_cast<const char*>(options.get("movie"))};
 
 #if defined(USE_ANALYTICS) && USE_ANALYTICS
     if (!Config::Get(Config::MAIN_ANALYTICS_PERMISSION_ASKED))

@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <ranges>
 
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -19,6 +20,7 @@
 #include <QTreeWidgetItem>
 
 #include "Common/Assert.h"
+#include "Common/EnumUtils.h"
 #include "Common/Swap.h"
 #include "Core/FifoPlayer/FifoPlayer.h"
 
@@ -191,8 +193,7 @@ void FIFOAnalyzer::UpdateTree()
     // We shouldn't end on a Command (it should end with an EFB copy)
     ASSERT(part_start == frame_info.parts.size());
     // The counts we computed should match the frame's counts
-    ASSERT(std::equal(frame_info.part_type_counts.begin(), frame_info.part_type_counts.end(),
-                      part_counts.begin()));
+    ASSERT(std::ranges::equal(frame_info.part_type_counts, part_counts));
   }
 }
 
@@ -262,7 +263,7 @@ public:
     const u32 object_prim_size = num_vertices * vertex_size;
 
     const u8 opcode =
-        0x80 | (static_cast<u8>(primitive) << OpcodeDecoder::GX_PRIMITIVE_SHIFT) | vat;
+        0x80 | Common::ToUnderlying(primitive) << OpcodeDecoder::GX_PRIMITIVE_SHIFT | vat;
     text = QStringLiteral("PRIMITIVE %1 (%2)  %3 vertices %4 bytes/vertex %5 total bytes")
                .arg(QString::fromStdString(name))
                .arg(opcode, 2, 16, QLatin1Char('0'))
@@ -472,9 +473,8 @@ void FIFOAnalyzer::FindNext()
   const int index = m_detail_list->currentRow();
   ASSERT(index >= 0);
 
-  auto next_result =
-      std::find_if(m_search_results.begin(), m_search_results.end(),
-                   [index](auto& result) { return result.m_cmd > static_cast<u32>(index); });
+  auto next_result = std::ranges::find_if(
+      m_search_results, [index](auto& result) { return result.m_cmd > static_cast<u32>(index); });
   if (next_result != m_search_results.end())
   {
     ShowSearchResult(next_result - m_search_results.begin());
@@ -487,8 +487,9 @@ void FIFOAnalyzer::FindPrevious()
   ASSERT(index >= 0);
 
   auto prev_result =
-      std::find_if(m_search_results.rbegin(), m_search_results.rend(),
-                   [index](auto& result) { return result.m_cmd < static_cast<u32>(index); });
+      std::ranges::find_if(m_search_results | std::views::reverse, [index](auto& result) {
+        return result.m_cmd < static_cast<u32>(index);
+      });
   if (prev_result != m_search_results.rend())
   {
     ShowSearchResult((m_search_results.rend() - prev_result) - 1);

@@ -163,28 +163,14 @@ protected:
   void AddInput(Input* const i);
   void AddOutput(Output* const o);
 
-  class FullAnalogSurface final : public Input
-  {
-  public:
-    FullAnalogSurface(Input* low, Input* high) : m_low(*low), m_high(*high) {}
-    ControlState GetState() const override;
-    std::string GetName() const override;
-    bool IsDetectable() const override;
-    bool IsHidden() const override;
-    bool IsMatchingName(std::string_view name) const override;
-
-  private:
-    Input& m_low;
-    Input& m_high;
-  };
-
-  void AddAnalogInputs(Input* low, Input* high)
-  {
-    AddInput(low);
-    AddInput(high);
-    AddInput(new FullAnalogSurface(low, high));
-    AddInput(new FullAnalogSurface(high, low));
-  }
+  // Pass Inputs for center-neutral (- and +) directions of some axis.
+  // This function adds those Inputs and also a FullAnalogSurface Input for each direction.
+  // This is only needed when it's not known if the particular axis is neutral in the center
+  //  or neutral on one of the extremes.
+  // Some e.g. DInput devices expose a trigger across the full analog surface
+  //  but we have no way of knowing this until the user actually maps the Input,
+  //  so both center-neutral and full-surface Inputs need to be created in that case.
+  void AddFullAnalogSurfaceInputs(Input* low, Input* high);
 
   void AddCombinedInput(std::string name, const std::pair<std::string, std::string>& inputs);
 
@@ -213,10 +199,8 @@ public:
   std::string ToString() const;
 
   bool operator==(const DeviceQualifier& devq) const;
-  bool operator!=(const DeviceQualifier& devq) const;
 
   bool operator==(const Device* dev) const;
-  bool operator!=(const Device* dev) const;
 
   std::string source;
   int cid;
@@ -226,8 +210,6 @@ public:
 class DeviceContainer
 {
 public:
-  using Clock = std::chrono::steady_clock;
-
   struct InputDetection
   {
     std::shared_ptr<Device> device;
@@ -248,18 +230,46 @@ public:
 
   bool HasConnectedDevice(const DeviceQualifier& qualifier) const;
 
-  std::vector<InputDetection> DetectInput(const std::vector<std::string>& device_strings,
-                                          std::chrono::milliseconds initial_wait,
-                                          std::chrono::milliseconds confirmation_wait,
-                                          std::chrono::milliseconds maximum_wait) const;
-
   std::recursive_mutex& GetDevicesMutex() const { return m_devices_mutex; }
 
 protected:
   // Exclusively needed when reading/writing the "m_devices" array.
-  // Not needed when individually readring/writing a single device ptr.
+  // Not needed when individually reading/writing a single device ptr.
   mutable std::recursive_mutex m_devices_mutex;
   std::vector<std::shared_ptr<Device>> m_devices;
 };
+
+// Wait for inputs on supplied devices.
+// Inputs are only considered if they are first seen in a neutral state.
+// This is useful for wacky flight sticks that have certain buttons that are always held down
+// and also properly handles detection when using "FullAnalogSurface" inputs.
+// Multiple detections are returned until the various timeouts have been reached.
+class InputDetector
+{
+public:
+  using Detection = DeviceContainer::InputDetection;
+  using Results = std::vector<Detection>;
+
+  InputDetector();
+  ~InputDetector();
+
+  void Start(const DeviceContainer& container, const std::vector<std::string>& device_strings);
+  void Update(std::chrono::milliseconds initial_wait, std::chrono::milliseconds confirmation_wait,
+              std::chrono::milliseconds maximum_wait);
+  bool IsComplete() const;
+
+  const Results& GetResults() const;
+
+  // move-return'd to prevent copying.
+  Results TakeResults();
+
+private:
+  struct Impl;
+
+  Clock::time_point m_start_time;
+  Results m_detections;
+  std::unique_ptr<Impl> m_state;
+};
+
 }  // namespace Core
 }  // namespace ciface

@@ -47,7 +47,6 @@ union RasterizationState
   }
 
   bool operator==(const RasterizationState& rhs) const { return hex == rhs.hex; }
-  bool operator!=(const RasterizationState& rhs) const { return !operator==(rhs); }
   bool operator<(const RasterizationState& rhs) const { return hex < rhs.hex; }
 
   BitField<0, 2, CullMode> cullmode;
@@ -73,7 +72,6 @@ union FramebufferState
   }
 
   bool operator==(const FramebufferState& rhs) const { return hex == rhs.hex; }
-  bool operator!=(const FramebufferState& rhs) const { return !operator==(rhs); }
 
   BitField<0, 8, AbstractTextureFormat> color_texture_format;
   BitField<8, 8, AbstractTextureFormat> depth_texture_format;
@@ -108,7 +106,6 @@ union DepthState
   }
 
   bool operator==(const DepthState& rhs) const { return hex == rhs.hex; }
-  bool operator!=(const DepthState& rhs) const { return !operator==(rhs); }
   bool operator<(const DepthState& rhs) const { return hex < rhs.hex; }
 
   BitField<0, 1, u32> testenable;
@@ -143,7 +140,6 @@ union BlendingState
   }
 
   bool operator==(const BlendingState& rhs) const { return hex == rhs.hex; }
-  bool operator!=(const BlendingState& rhs) const { return !operator==(rhs); }
   bool operator<(const BlendingState& rhs) const { return hex < rhs.hex; }
 
   BitField<0, 1, u32> blendenable;
@@ -185,7 +181,6 @@ struct SamplerState
   }
 
   bool operator==(const SamplerState& rhs) const { return Hex() == rhs.Hex(); }
-  bool operator!=(const SamplerState& rhs) const { return !operator==(rhs); }
   bool operator<(const SamplerState& rhs) const { return Hex() < rhs.Hex(); }
 
   constexpr u64 Hex() const { return tm0.hex | (static_cast<u64>(tm1.hex) << 32); }
@@ -205,7 +200,7 @@ struct SamplerState
     BitField<7, 1, LODType> diag_lod;
     BitField<8, 16, s32> lod_bias;         // multiplied by 256, higher precision than normal
     BitField<24, 1, bool, u32> lod_clamp;  // TODO: This isn't currently implemented
-    BitField<25, 1, bool, u32> anisotropic_filtering;  // TODO: This doesn't use the BP one yet
+    BitField<25, 4, u32> anisotropic_filtering;
     u32 hex = 0;
   };
   union TM1

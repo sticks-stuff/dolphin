@@ -9,14 +9,12 @@
 #include <vector>
 
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 #include "Common/Common.h"
 #include "Common/CommonTypes.h"
 #include "Common/FileUtil.h"
 #include "Common/IniFile.h"
-#include "Common/StringUtil.h"
-#include "Core/Config/MainSettings.h"
-#include "Core/ConfigManager.h"
 
 #include "InputCommon/ControllerEmu/Control/Input.h"
 #include "InputCommon/ControllerEmu/ControlGroup/Buttons.h"
@@ -90,6 +88,7 @@ constexpr std::array<const char*, NUM_HOTKEYS> s_hotkey_labels{{
     _trans("Connect Balance Board"),
     _trans("Toggle SD Card"),
     _trans("Toggle USB Keyboard"),
+    _trans("Toggle Wii Speak Mute"),
 
     _trans("Next Profile"),
     _trans("Previous Profile"),
@@ -355,7 +354,7 @@ constexpr std::array<HotkeyGroupInfo, NUM_HOTKEY_GROUPS> s_groups_info = {
      {_trans("Stepping"), HK_STEP, HK_SKIP},
      {_trans("Program Counter"), HK_SHOW_PC, HK_SET_PC},
      {_trans("Breakpoint"), HK_BP_TOGGLE, HK_MBP_ADD},
-     {_trans("Wii"), HK_TRIGGER_SYNC_BUTTON, HK_TOGGLE_USB_KEYBOARD},
+     {_trans("Wii"), HK_TRIGGER_SYNC_BUTTON, HK_TOGGLE_WII_SPEAK_MUTE},
      {_trans("Controller Profile 1"), HK_NEXT_WIIMOTE_PROFILE_1, HK_PREV_GAME_WIIMOTE_PROFILE_1},
      {_trans("Controller Profile 2"), HK_NEXT_WIIMOTE_PROFILE_2, HK_PREV_GAME_WIIMOTE_PROFILE_2},
      {_trans("Controller Profile 3"), HK_NEXT_WIIMOTE_PROFILE_3, HK_PREV_GAME_WIIMOTE_PROFILE_3},
@@ -431,8 +430,8 @@ ControllerEmu::ControlGroup* HotkeyManager::GetHotkeyGroup(HotkeyGroup group) co
 
 int HotkeyManager::FindGroupByID(int id) const
 {
-  const auto i = std::find_if(s_groups_info.begin(), s_groups_info.end(),
-                              [id](const auto& entry) { return entry.last >= id; });
+  const auto i =
+      std::ranges::find_if(s_groups_info, [id](const auto& entry) { return entry.last >= id; });
 
   return static_cast<int>(std::distance(s_groups_info.begin(), i));
 }
@@ -453,7 +452,7 @@ void HotkeyManager::LoadDefaults(const ControllerInterface& ciface)
   };
 
   auto hotkey_string = [](std::vector<std::string> inputs) {
-    return "@(" + JoinStrings(inputs, "+") + ')';
+    return fmt::format("@({})", fmt::join(inputs, "+"));
   };
 
   // General hotkeys

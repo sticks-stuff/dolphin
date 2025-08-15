@@ -16,11 +16,11 @@ struct ConfigChangedCallbackID
   size_t id = -1;
 
   bool operator==(const ConfigChangedCallbackID&) const = default;
-  bool operator!=(const ConfigChangedCallbackID&) const = default;
 };
 
-// returns an ID that can be passed to RemoveConfigChangedCallback()
-ConfigChangedCallbackID AddConfigChangedCallback(Config::ConfigChangedCallback func);
+// Returns an ID that should be passed to RemoveConfigChangedCallback() when the callback is no
+// longer needed.
+[[nodiscard]] ConfigChangedCallbackID AddConfigChangedCallback(Config::ConfigChangedCallback func);
 
 void RemoveConfigChangedCallback(ConfigChangedCallbackID callback_id);
 

@@ -267,7 +267,7 @@ void LoadIndexedXF(CPArray array, u32 index, u16 address, u8 size)
   auto& fifo = system.GetFifo();
   if (fifo.UseDeterministicGPUThread())
   {
-    newData = reinterpret_cast<u32*>(fifo.PopFifoAuxBuffer(buf_size));
+    newData = static_cast<u32*>(fifo.PopFifoAuxBuffer(buf_size));
   }
   else
   {
@@ -646,7 +646,7 @@ std::pair<std::string, std::string> GetXFTransferInfo(u16 base_address, u8 trans
 std::pair<std::string, std::string> GetXFIndexedLoadInfo(CPArray array, u32 index, u16 address,
                                                          u8 size)
 {
-  const auto desc = fmt::format("Load {} bytes to XF address {:03x} from CP array {} row {}", size,
+  const auto desc = fmt::format("Load {} words to XF address {:03x} from CP array {} row {}", size,
                                 address, array, index);
   fmt::memory_buffer written;
   for (u32 i = 0; i < size; i++)

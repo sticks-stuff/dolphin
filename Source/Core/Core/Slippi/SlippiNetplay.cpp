@@ -2,19 +2,20 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
-#include "Core/Slippi/SlippiNetplay.h"
 #include "Common/CommonTypes.h"
 #include "Common/Config/Config.h"
 #include "Common/ENet.h"
 #include "Common/Logging/Log.h"
 #include "Common/MsgHandler.h"
 #include "Common/Timer.h"
+#include "Core/Config/GraphicsSettings.h"
 #include "Core/Config/NetplaySettings.h"
 #include "Core/ConfigManager.h"
 #include "Core/Core.h"
 #include "Core/NetPlayProto.h"
-#include "SlippiGame.h"
-#include "SlippiPremadeText.h"
+#include "Core/Slippi/SlippiGame.h"
+#include "Core/Slippi/SlippiNetplay.h"
+#include "Core/Slippi/SlippiPremadeText.h"
 #include "VideoCommon/OnScreenDisplay.h"
 #include "VideoCommon/VideoConfig.h"
 
@@ -414,7 +415,7 @@ unsigned int SlippiNetplayClient::OnData(sf::Packet& packet, ENetPeer* peer)
     ack_timers[p_idx].Pop();
 
     ping_us[p_idx] = Common::Timer::NowUs() - send_time;
-    if (g_ActiveConfig.bShowNetPlayPing && frame % SLIPPI_PING_DISPLAY_INTERVAL == 0 && p_idx == 0)
+    if (Config::Get(Config::GFX_SHOW_NETPLAY_PING) && frame % SLIPPI_PING_DISPLAY_INTERVAL == 0 && p_idx == 0)
     {
       std::stringstream ping_display;
       ping_display << "Ping: " << (ping_us[0] / 1000);
@@ -543,6 +544,7 @@ void SlippiNetplayClient::writeToPacket(sf::Packet& packet, SlippiPlayerSelectio
   packet << s.stage_id << s.is_stage_selected;
   packet << s.rng_offset;
   packet << s.team_id;
+  packet << s.alt_stage_mode;
 }
 
 void SlippiNetplayClient::WriteChatMessageToPacket(sf::Packet& packet, int message_id, u8 player_id)
@@ -646,6 +648,11 @@ SlippiNetplayClient::readSelectionsFromPacket(sf::Packet& packet)
     s->error = true;
   }
   if (!(packet >> s->team_id))
+  {
+    ERROR_LOG_FMT(SLIPPI_ONLINE, "Received invalid player selection");
+    s->error = true;
+  }
+  if (!(packet >> s->alt_stage_mode))
   {
     ERROR_LOG_FMT(SLIPPI_ONLINE, "Received invalid player selection");
     s->error = true;

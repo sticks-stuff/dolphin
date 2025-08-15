@@ -941,8 +941,7 @@ ConversionResultCode WIARVZFileReader<RVZ>::SetUpDataEntriesForWriting(
   if (volume && volume->HasWiiHashes() && volume->HasWiiEncryption())
     partitions = volume->GetPartitions();
 
-  std::sort(partitions.begin(), partitions.end(),
-            [](const Partition& a, const Partition& b) { return a.offset < b.offset; });
+  std::ranges::sort(partitions, {}, &Partition::offset);
 
   *total_groups = 0;
 
@@ -1126,7 +1125,7 @@ bool WIARVZFileReader<RVZ>::TryReuse(std::map<ReuseID, GroupEntry>* reusable_gro
 
 static bool AllAre(const std::vector<u8>& data, u8 x)
 {
-  return std::all_of(data.begin(), data.end(), [x](u8 y) { return x == y; });
+  return std::ranges::all_of(data, [x](u8 y) { return x == y; });
 }
 
 static bool AllAre(const u8* begin, const u8* end, u8 x)
@@ -1256,7 +1255,7 @@ static void RVZPack(const u8* in, OutputParametersEntry* out, u64 bytes_per_chun
       {
         if (next_junk_start == end_offset)
         {
-          // Storing this chunk without RVZ packing would be inefficient, so store it without
+          // Storing this chunk with RVZ packing would be inefficient, so store it without
           PushBack(&entry.main_data, in + current_offset, in + end_offset);
           break;
         }
@@ -1372,15 +1371,15 @@ WIARVZFileReader<RVZ>::ProcessAndCompress(CompressThreadState* state, CompressPa
       TryReuse(reusable_groups, reusable_groups_mutex, &entry);
       if (!entry.reused_group && reuse_id)
       {
-        const auto it = std::find_if(output_entries.begin(), output_entries.begin() + i,
-                                     [reuse_id](const auto& e) { return e.reuse_id == reuse_id; });
+        const auto it = std::ranges::find(output_entries.begin(), output_entries.begin() + i,
+                                          reuse_id, &OutputParametersEntry::reuse_id);
         if (it != output_entries.begin() + i)
           entry.reused_group = it->reused_group;
       }
     }
 
-    if (!std::all_of(output_entries.begin(), output_entries.end(),
-                     [](const OutputParametersEntry& entry) { return entry.reused_group; }))
+    if (!std::ranges::all_of(output_entries,
+                             [](const auto& entry) { return entry.reused_group.has_value(); }))
     {
       const u64 number_of_exception_lists =
           chunks_per_wii_group == 1 ? exception_lists_per_chunk : chunks;
@@ -1635,7 +1634,7 @@ WIARVZFileReader<RVZ>::ProcessAndCompress(CompressThreadState* state, CompressPa
       const size_t size = state->compressor->GetSize();
 
       entry.main_data.resize(size);
-      std::copy(data, data + size, entry.main_data.data());
+      std::copy_n(data, size, entry.main_data.data());
 
       if (compressed_exception_lists)
         entry.exception_lists.clear();
@@ -1701,7 +1700,7 @@ ConversionResultCode WIARVZFileReader<RVZ>::Output(std::vector<OutputParametersE
 template <bool RVZ>
 ConversionResultCode WIARVZFileReader<RVZ>::RunCallback(size_t groups_written, u64 bytes_read,
                                                         u64 bytes_written, u32 total_groups,
-                                                        u64 iso_size, CompressCB callback)
+                                                        u64 iso_size, const CompressCB& callback)
 {
   int ratio = 0;
   if (bytes_read != 0)
@@ -2041,7 +2040,7 @@ WIARVZFileReader<RVZ>::Convert(BlobReader* infile, const VolumeDisc* infile_volu
 bool ConvertToWIAOrRVZ(BlobReader* infile, const std::string& infile_path,
                        const std::string& outfile_path, bool rvz,
                        WIARVZCompressionType compression_type, int compression_level,
-                       int chunk_size, CompressCB callback)
+                       int chunk_size, const CompressCB& callback)
 {
   File::IOFile outfile(outfile_path, "wb");
   if (!outfile)

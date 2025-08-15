@@ -62,6 +62,10 @@ void Host_PPCSymbolsChanged()
 {
 }
 
+void Host_PPCBreakpointsChanged()
+{
+}
+
 void Host_RefreshDSPDebuggerWindow()
 {
 }
@@ -84,6 +88,14 @@ void Host_UpdateTitle(const std::string& title)
 }
 
 void Host_UpdateDisasmDialog()
+{
+}
+
+void Host_JitCacheInvalidation()
+{
+}
+
+void Host_JitProfileDataWiped()
 {
 }
 
@@ -210,23 +222,22 @@ int main(int argc, char* argv[])
   parser->add_option("-p", "--platform")
       .action("store")
       .help("Window platform to use [%choices]")
-      .choices({
-        "headless"
+      .choices({"headless"
 #ifdef __linux__
-            ,
-            "fbdev"
+                ,
+                "fbdev"
 #endif
 #if HAVE_X11
-            ,
-            "x11"
+                ,
+                "x11"
 #endif
 #ifdef _WIN32
-            ,
-            "win32"
+                ,
+                "win32"
 #endif
 #ifdef __APPLE__
-            ,
-            "macos"
+                ,
+                "macos"
 #endif
       });
 

@@ -15,6 +15,8 @@
 #include <utility>
 #include <vector>
 
+#include <fmt/ranges.h>
+
 #include "Common/Align.h"
 #include "Common/CommonPaths.h"
 #include "Common/CommonTypes.h"
@@ -91,7 +93,7 @@ static std::vector<std::string> ReadM3UFile(const std::string& m3u_path,
   if (!nonexistent.empty())
   {
     PanicAlertFmtT("Files specified in the M3U file \"{0}\" were not found:\n{1}", m3u_path,
-                   JoinStrings(nonexistent, "\n"));
+                   fmt::join(nonexistent, "\n"));
     return {};
   }
 
@@ -235,7 +237,8 @@ std::unique_ptr<BootParameters> BootParameters::GenerateFromFile(std::vector<std
 #endif
 
   static const std::unordered_set<std::string> disc_image_extensions = {
-      {".gcm", ".iso", ".tgc", ".wbfs", ".ciso", ".gcz", ".wia", ".rvz", ".nfs", ".dol", ".elf"}};
+      {".gcm", ".bin", ".iso", ".tgc", ".wbfs", ".ciso", ".gcz", ".wia", ".rvz", ".nfs", ".dol",
+       ".elf"}};
   if (disc_image_extensions.contains(extension))
   {
     std::unique_ptr<DiscIO::VolumeDisc> disc = DiscIO::CreateDisc(path);
@@ -391,12 +394,21 @@ bool CBoot::LoadMapFromFilename(const Core::CPUThreadGuard& guard, PPCSymbolDB& 
 bool CBoot::Load_BS2(Core::System& system, const std::string& boot_rom_filename)
 {
   // CRC32 hashes of the IPL file, obtained from Redump
+  // DOL-001(USA) / DOL-001(JPN) / DOT-001 / SL-GC10 (NTSC Revision 1.0)
   constexpr u32 NTSC_v1_0 = 0x6DAC1F2A;
+  // DOL-001(USA) / DOL-001(JPN) / DOT-001 (NTSC Revision 1.1)
   constexpr u32 NTSC_v1_1 = 0xD5E6FEEA;
-  constexpr u32 NTSC_v1_2 = 0x86573808;
-  constexpr u32 MPAL_v1_1 = 0x667D0B64;  // Brazil
+  // DOL-001(USA) / DOL-001(JPN) (NTSC Revision 1.2)
+  constexpr u32 NTSC_v1_2_001 = 0xD235E3F9;
+  // DOL-101(USA) / DOL-101(JPN) (NTSC Revision 1.2)
+  constexpr u32 NTSC_v1_2_101 = 0x86573808;
+  // DOL-002(BRA) (MPAL Revision 1.1)
+  constexpr u32 MPAL_v1_1 = 0x667D0B64;
+  // DOL-001(EUR) / DOT-001P (PAL Revision 1.0)
   constexpr u32 PAL_v1_0 = 0x4F319F43;
+  // DOL-101(EUR) (PAL Revision 1.2)
   constexpr u32 PAL_v1_2 = 0xAD1B7F16;
+  constexpr u32 Triforce = 0xD1883221;  // The Triforce's special IPL
 
   // Load the IPL ROM dump, limited to 2MiB which is the size of the official IPLs.
   constexpr size_t max_ipl_size = 2 * 1024 * 1024;
@@ -418,7 +430,8 @@ bool CBoot::Load_BS2(Core::System& system, const std::string& boot_rom_filename)
   {
   case NTSC_v1_0:
   case NTSC_v1_1:
-  case NTSC_v1_2:
+  case NTSC_v1_2_001:
+  case NTSC_v1_2_101:
   case MPAL_v1_1:
     known_ipl = true;
     break;
@@ -427,6 +440,8 @@ bool CBoot::Load_BS2(Core::System& system, const std::string& boot_rom_filename)
     pal_ipl = true;
     known_ipl = true;
     break;
+  case Triforce:
+    known_ipl = true;
   default:
     PanicAlertFmtT("The IPL file is not a known good dump. (CRC32: {0:x})", ipl_hash);
     break;
@@ -540,7 +555,7 @@ bool CBoot::BootUp(Core::System& system, const Core::CPUThreadGuard& guard,
       if (!EmulatedBS2(system, guard, system.IsWii(), *volume, riivolution_patches))
         return false;
 
-      SConfig::OnNewTitleLoad(guard);
+      SConfig::OnTitleDirectlyBooted(guard);
       return true;
     }
 
@@ -570,13 +585,18 @@ bool CBoot::BootUp(Core::System& system, const Core::CPUThreadGuard& guard,
         // we default to IOS58, which is the version used by the Homebrew Channel.
         SetupWiiMemory(system, IOS::HLE::IOSC::ConsoleType::Retail);
         system.GetIOS()->BootIOS(Titles::IOS(58));
+
+        // The Apploader writes an IOS-like version number into memory.
+        // Older versions of OSInit read it to check IOS compatibility.
+        constexpr u32 ADDR_IOS_VERSION = 0x3140;
+        constexpr u32 ADDR_APPLOADER_VERSION = 0x3188;
+        const u32 ios_version = system.GetMemory().Read_U32(ADDR_IOS_VERSION);
+        system.GetMemory().Write_U32(ios_version, ADDR_APPLOADER_VERSION);
       }
       else
       {
         SetupGCMemory(system, guard);
       }
-
-      AchievementManager::GetInstance().LoadGame(executable.path, nullptr);
 
       if (!executable.reader->LoadIntoMemory(system))
       {
@@ -584,11 +604,13 @@ bool CBoot::BootUp(Core::System& system, const Core::CPUThreadGuard& guard,
         return false;
       }
 
-      SConfig::OnNewTitleLoad(guard);
+      SConfig::OnTitleDirectlyBooted(guard);
 
       ppc_state.pc = executable.reader->GetEntryPoint();
 
-      if (executable.reader->LoadSymbols(guard, system.GetPPCSymbolDB()))
+      const std::string filename = PathToFileName(executable.path);
+
+      if (executable.reader->LoadSymbols(guard, system.GetPPCSymbolDB(), filename))
       {
         Host_PPCSymbolsChanged();
         HLE::PatchFunctions(system);
@@ -602,7 +624,9 @@ bool CBoot::BootUp(Core::System& system, const Core::CPUThreadGuard& guard,
       if (!Boot_WiiWAD(system, wad))
         return false;
 
-      SConfig::OnNewTitleLoad(guard);
+      AchievementManager::GetInstance().LoadGame(&wad);
+
+      SConfig::OnTitleDirectlyBooted(guard);
       return true;
     }
 
@@ -612,7 +636,7 @@ bool CBoot::BootUp(Core::System& system, const Core::CPUThreadGuard& guard,
       if (!BootNANDTitle(system, nand_title.id))
         return false;
 
-      SConfig::OnNewTitleLoad(guard);
+      SConfig::OnTitleDirectlyBooted(guard);
       return true;
     }
 
@@ -638,7 +662,7 @@ bool CBoot::BootUp(Core::System& system, const Core::CPUThreadGuard& guard,
                 ipl.disc->auto_disc_change_paths);
       }
 
-      SConfig::OnNewTitleLoad(guard);
+      SConfig::OnTitleDirectlyBooted(guard);
       return true;
     }
 

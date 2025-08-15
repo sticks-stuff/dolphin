@@ -123,8 +123,10 @@ jobs:
             Invoke-WebRequest -Uri https://www.ssl.com/download/codesigntool-for-windows/ -UseBasicParsing -OutFile ".\CodeSignTool.zip"
             7z x CodeSignTool.zip
             Remove-Item CodeSignTool.zip
+          } else {
+            cd .\CodeSignTool
           }
-          ./CodeSignTool.bat sign -credential_id="${{ secrets.ES_CREDENTIAL_ID }}" -username="${{ secrets.ES_USERNAME }}" -password="${{ secrets.ES_PASSWORD }}" -totp_secret="${{ secrets.ES_TOTP_SECRET }}" -input_file_path="${{ github.workspace }}\Binary\x64\Slippi_Dolphin.exe" -override="true"
+          .\CodeSignTool.bat sign -credential_id="${{ secrets.ES_CREDENTIAL_ID }}" -username="${{ secrets.ES_USERNAME }}" -password="${{ secrets.ES_PASSWORD }}" -totp_secret="${{ secrets.ES_TOTP_SECRET }}" -input_file_path="${{ github.workspace }}\Binary\x64\Slippi_Dolphin.exe" -override="true"
       - name: Package Artifact
         working-directory: ${{ github.workspace }}
         run: |
@@ -287,7 +289,6 @@ jobs:
         run: |
           rm '/usr/local/bin/2to3' || true
           echo "HOMEBREW_NO_AUTO_UPDATE=1" >> $GITHUB_ENV
-          brew upgrade cmake
           brew install \
           ffmpeg \
           libpng \
@@ -296,6 +297,7 @@ jobs:
           sound-touch \
           hidapi \
           qt@6
+#         brew upgrade cmake
       - name: "Build ${{ matrix.build_type }} Dolphin"
         shell: bash
         working-directory: ${{ github.workspace }}

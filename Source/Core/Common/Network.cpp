@@ -36,10 +36,10 @@ MACAddress GenerateMacAddress(const MACConsumer type)
   switch (type)
   {
   case MACConsumer::BBA:
-    std::copy(oui_bba.begin(), oui_bba.end(), mac.begin());
+    std::ranges::copy(oui_bba, mac.begin());
     break;
   case MACConsumer::IOS:
-    std::copy(oui_ios.begin(), oui_ios.end(), mac.begin());
+    std::ranges::copy(oui_ios, mac.begin());
     break;
   }
 
@@ -293,7 +293,7 @@ u16 ComputeNetworkChecksum(const void* data, u16 length, u32 initial_value)
 {
   u32 checksum = initial_value;
   std::size_t index = 0;
-  const std::string_view data_view{reinterpret_cast<const char*>(data), length};
+  const std::string_view data_view{static_cast<const char*>(data), length};
   for (u8 b : data_view)
   {
     const bool is_hi = index++ % 2 == 0;

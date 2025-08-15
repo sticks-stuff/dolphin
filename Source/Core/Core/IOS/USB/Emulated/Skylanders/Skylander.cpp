@@ -296,7 +296,7 @@ const std::map<const std::pair<const u16, const u16>, SkyData> list_skylanders =
     {{453, 0x3403}, {"Blades (Legendary)", Game::TrapTeam, Element::Air, Type::Skylander}},
     {{454, 0x3000}, {"Wallop", Game::TrapTeam, Element::Earth, Type::TrapMaster}},
     {{455, 0x3000}, {"Head Rush", Game::TrapTeam, Element::Earth, Type::TrapMaster}},
-    {{455, 0x3402}, {"Head Rush (Nitro)", Game::TrapTeam, Element::Earth, Type::Skylander}},
+    {{455, 0x3402}, {"Head Rush (Nitro)", Game::TrapTeam, Element::Earth, Type::TrapMaster}},
     {{456, 0x3000}, {"Fist Bump", Game::TrapTeam, Element::Earth, Type::Skylander}},
     {{457, 0x3000}, {"Rocky Roll", Game::TrapTeam, Element::Earth, Type::Skylander}},
     {{458, 0x3000}, {"Wildfire", Game::TrapTeam, Element::Fire, Type::TrapMaster}},
@@ -612,10 +612,10 @@ const std::map<const std::pair<const u16, const u16>, SkyData> list_skylanders =
     {{3503, 0x4000}, {"Kaos Trophy", Game::Superchargers, Element::Other, Type::Trophy}},
 };
 
-SkylanderUSB::SkylanderUSB(EmulationKernel& ios, const std::string& device_name) : m_ios(ios)
+SkylanderUSB::SkylanderUSB()
 {
   m_vid = 0x1430;
-  m_pid = 0x150;
+  m_pid = 0x0150;
   m_id = (static_cast<u64>(m_vid) << 32 | static_cast<u64>(m_pid) << 16 | static_cast<u64>(9) << 8 |
           static_cast<u64>(1));
   m_device_descriptor = DeviceDescriptor{0x12,   0x1,   0x200, 0x0, 0x0, 0x0, 0x40,
@@ -741,7 +741,7 @@ int SkylanderUSB::SubmitTransfer(std::unique_ptr<CtrlMessage> cmd)
   else
   {
     // Skylander Portal Requests
-    auto& system = m_ios.GetSystem();
+    auto& system = cmd->GetEmulationKernel().GetSystem();
     auto& memory = system.GetMemory();
     u8* buf = memory.GetPointerForRange(cmd->data_address, cmd->length);
     if (cmd->length == 0 || buf == nullptr)
@@ -929,7 +929,7 @@ int SkylanderUSB::SubmitTransfer(std::unique_ptr<CtrlMessage> cmd)
       // The 4 bytes {55, 00, 00, 55} are the status of characters on the portal. The 4 bytes are
       // treated as a 32-bit binary array. Each unique Skylander placed on a board is represented
       // by 2 bits starting with the first Skylander in the least significant bit. This bit is
-      // present whenever the Skylandar is added or present on the portal. When the Skylander is
+      // present whenever the Skylander is added or present on the portal. When the Skylander is
       // added to the board, both bits are set in the next status message as a one-time signal.
       // When a Skylander is removed from the board, only the most significant bit of the 2 bits
       // is set.
@@ -1028,7 +1028,7 @@ int SkylanderUSB::SubmitTransfer(std::unique_ptr<IntrMessage> cmd)
   DEBUG_LOG_FMT(IOS_USB, "[{:04x}:{:04x} {}] Interrupt: length={} endpoint={}", m_vid, m_pid,
                 m_active_interface, cmd->length, cmd->endpoint);
 
-  auto& system = m_ios.GetSystem();
+  auto& system = cmd->GetEmulationKernel().GetSystem();
   auto& memory = system.GetMemory();
   u8* buf = memory.GetPointerForRange(cmd->data_address, cmd->length);
   if (cmd->length == 0 || buf == nullptr)
