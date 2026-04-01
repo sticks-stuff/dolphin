@@ -363,14 +363,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        build_type: [Netplay, Playback]
+        build_type: [Netplay]
         include:
           - build_type: Netplay
             artifact_name: mainline-macOS-netplay-universal
             build_config: netplay
-          - build_type: Playback
-            artifact_name: mainline-macOS-playback-universal
-            build_config: playback
+          # - build_type: Playback
+          #   artifact_name: mainline-macOS-playback-universal
+          #   build_config: playback
     name: "macOS ${{ matrix.build_type }} universal"
     runs-on: macos-14
     steps:
@@ -417,6 +417,9 @@ jobs:
           sound-touch \
           hidapi \
           qt@6
+          brew uninstall cmake
+          brew install cmake@3
+          brew link --force --overwrite cmake@3
 #         brew upgrade cmake
       - name: "Build ${{ matrix.build_type }} Dolphin"
         shell: bash
