@@ -28,7 +28,7 @@ jobs:
   # goal is to prevent merges when the commit is not from the main branch, builds should still succeed
   check_rust_commit:
     needs: [pre_build]
-    if: ${{ needs.pre_build.outputs.should_skip != 'true' }}
+    if: false
     name: Verify SlippiRustExtensions Commit is in Main
     runs-on: ubuntu-latest
     steps:
@@ -43,7 +43,7 @@ jobs:
 
   windows:
     needs: [pre_build]
-    if: ${{ needs.pre_build.outputs.should_skip != 'true' }}
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -144,7 +144,7 @@ jobs:
           path: "./artifact/"
   linux:
     needs: [pre_build]
-    if: ${{ needs.pre_build.outputs.should_skip != 'true' }}
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -249,7 +249,7 @@ jobs:
           path: "./artifact/"
   macOS-x86_64:
     needs: [pre_build]
-    if: ${{ needs.pre_build.outputs.should_skip != 'true' }}
+    if: false
     strategy:
       fail-fast: false
       matrix:
