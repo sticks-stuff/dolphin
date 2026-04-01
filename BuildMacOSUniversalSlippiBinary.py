@@ -378,6 +378,7 @@ def build(config):
                 "-DUSE_SYSTEM_ICONV=ON",
                 "-DUSE_SYSTEM_BZIP2=ON",
                 "-DUSE_SYSTEM_CURL=ON",
+                "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
                 "-DSLIPPI_PLAYBACK=" + ("true" if config["build_config"] == "playback" else "false"),
             ],
             env=env, cwd=arch)
