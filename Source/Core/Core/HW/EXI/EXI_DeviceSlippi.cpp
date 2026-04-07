@@ -2121,7 +2121,7 @@ void CEXISlippi::prepareOnlineMatchState()
   chat_message_player_idx = 0;
   local_chat_message_id = 0;
   // in CSS p1 is always current player and p2 is opponent
-  local_player_name = p1_ame = user_info.display_name;
+  local_player_name = p1_name = user_info.display_name;
   opp_name = p2_name = "Player 2";
   p1_rank = 8;
   p2_rank = 15;
@@ -2399,7 +2399,9 @@ void CEXISlippi::prepareOnlineMatchState()
     //*game_bit_field3 = *game_bit_field3 | 0x8;
 
     // Overwrite alt_stage_mode if in ranked
-    if (!pause_allowed)
+    auto stage_selection_mode = last_search.mode == SlippiMatchmaking::OnlinePlayMode::DIRECT ||
+                                last_search.mode == SlippiMatchmaking::OnlinePlayMode::TEAMS;
+    if (!stage_selection_mode)
     {
       alt_stage_mode = 0;
     }
