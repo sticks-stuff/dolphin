@@ -10,6 +10,9 @@ ARCH=$(uname -m)
 # -L/opt/homebrew/lib/ to actually find the library.
 if [[ "$ARCH" == 'arm64' ]]; then
   CMAKE_FLAGS+=" -DUSE_SYSTEM_XXHASH=OFF"
+  CMAKE_FLAGS+=" -DCMAKE_PREFIX_PATH=/opt/homebrew"
+elif [[ "$ARCH" == 'x86_64' ]]; then
+  CMAKE_FLAGS+=" -DCMAKE_PREFIX_PATH=/usr/local"
 fi
 export LIBRARY_PATH=$LIBRARY_PATH:/usr/local/lib:/usr/lib/
 
@@ -25,12 +28,6 @@ fi
 if [ "$CI" == "true" ]
 then
         CMAKE_FLAGS+=" -DMACOS_CODE_SIGNING=OFF"
-fi
-
-if [[ "$ARCH" == 'arm64' ]]; then
-  CMAKE_FLAGS+=" -DCMAKE_PREFIX_PATH=/opt/homebrew"
-elif [[ "$ARCH" == 'x86_64' ]]; then
-  CMAKE_FLAGS+=" -DCMAKE_PREFIX_PATH=/usr/local"
 fi
 
 # Move into the build directory, run CMake, and compile the project
