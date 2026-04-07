@@ -427,7 +427,7 @@ jobs:
           export LIBRARY_PATH=$LIBRARY_PATH:/usr/local/lib
           mkdir build
           cd build
-          python3 ../BuildMacOSUniversalBinary.py --build_config ${{ matrix.build_config }}
+          python3 ../BuildMacOSUniversalSlippiBinary.py --build_config ${{ matrix.build_config }}
           cd ..
           mkdir artifact
           FILE_NAME=${{ env.CURR_DATE }}-${{ env.GIT_HASH }}-${{ env.GIT_TAG }}-${{ matrix.artifact_name }}
