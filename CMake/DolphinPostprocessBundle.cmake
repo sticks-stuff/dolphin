@@ -32,7 +32,7 @@ file(GLOB_RECURSE extra_libs "${DOLPHIN_BUNDLE_PATH}/Contents/MacOS/*.dylib")
 # equivalent search directories until https://gitlab.kitware.com/cmake/cmake/issues/16625
 # is fixed and in our minimum CMake version.
 if (DOLPHIN_ARCH MATCHES "arm64")
-	set(extra_dirs "/opt/homebrew/lib")
+	set(extra_dirs "/opt/homebrew/lib") # slippi change: homebrew installs are in /opt/homebrew/lib rather then /usr/local/lib on apple silicon
 else()
 	set(extra_dirs "/usr/local/lib" "/lib" "/usr/lib")
 endif()
