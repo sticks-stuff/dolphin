@@ -261,8 +261,8 @@ jobs:
           - build_type: Playback
             artifact_name: mainline-macOS-playback
             build_config: playback
-    name: "macOS ${{ matrix.build_type }} x86_64"
-    runs-on: macos-13
+    name: "macOS ${{ matrix.build_type }}"
+    runs-on: macos-15-intel
     steps:
       - name: "Checkout"
         uses: actions/checkout@v4
